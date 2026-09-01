@@ -9,3 +9,5 @@ __pycache__/
 # системное
 .DS_Store
 Thumbs.db
+*.bak
+data.js.bak

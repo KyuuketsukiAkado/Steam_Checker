@@ -384,12 +384,15 @@
 
   var shareCanvas = $("#shareCanvas");
 
-  (function drawCard() {
+  function redrawCard() {
     var c = shareCanvas, x = c.getContext("2d");
     var W = c.width, H = c.height;
     var INK = "#F2F0EC", DIM = "#7C7871";
     var C1 = "#FF5C38", C2 = "#8B5CF6", C3 = "#22D3A5", C4 = "#FFC53D", C5 = "#4CC2FF";
-    var SANS = 'Inter, "Segoe UI", -apple-system, Roboto, Helvetica, Arial, sans-serif';
+    var css = getComputedStyle(document.documentElement);
+    var SANS = (css.getPropertyValue("--display") || "").trim() ||
+               'Helvetica, Arial, sans-serif';
+    var WD = (css.getPropertyValue("--w-display") || "700").trim();
 
     // фон + цветные пятна
     x.fillStyle = "#0A0A0C"; x.fillRect(0, 0, W, H);
@@ -429,11 +432,11 @@
     line(148);
 
     // ник
-    x.fillStyle = INK; x.font = "800 104px " + SANS;
-    x.fillText(fit(D.meta.persona || "profile", W - M * 2, "800 104px " + SANS), M, 288);
+    x.fillStyle = INK; x.font = WD + " 104px " + SANS;
+    x.fillText(fit(D.meta.persona || "profile", W - M * 2, WD + " 104px " + SANS), M, 288);
     var grad = x.createLinearGradient(M, 0, W - M, 0);
     grad.addColorStop(0, C1); grad.addColorStop(0.45, C4); grad.addColorStop(0.8, C2); grad.addColorStop(1, C5);
-    x.fillStyle = grad; x.font = "800 104px " + SANS;
+    x.fillStyle = grad; x.font = WD + " 104px " + SANS;
     x.fillText("в цифрах.", M, 398);
 
     // три цифры
@@ -447,7 +450,7 @@
     cols.forEach(function (col, i) {
       var cx = M + colW * i;
       x.fillStyle = col[2]; x.fillRect(cx, 512, 46, 5);
-      x.fillStyle = col[2]; x.font = "800 88px " + SANS;
+      x.fillStyle = col[2]; x.font = WD + " 88px " + SANS;
       x.fillText(col[0], cx, 606);
       x.fillStyle = DIM; x.font = "600 24px " + SANS;
       x.fillText(col[1], cx, 648);
@@ -457,13 +460,13 @@
     // игра жизни
     if (soulmate) {
       label("ГЛАВНАЯ ИГРА ЖИЗНИ", 772, C1);
-      x.fillStyle = INK; x.font = "800 74px " + SANS;
-      x.fillText(fit(soulmate.name, W - M * 2, "800 74px " + SANS), M, 858);
+      x.fillStyle = INK; x.font = WD + " 74px " + SANS;
+      x.fillText(fit(soulmate.name, W - M * 2, WD + " 74px " + SANS), M, 858);
 
       var hh = num(soulmate.hours);
       var g2 = x.createLinearGradient(M, 0, W * 0.8, 0);
       g2.addColorStop(0, C1); g2.addColorStop(1, C4);
-      x.fillStyle = g2; x.font = "800 148px " + SANS;
+      x.fillStyle = g2; x.font = WD + " 148px " + SANS;
       x.fillText(hh, M, 1002);
       var w = x.measureText(hh).width;
       x.fillStyle = DIM; x.font = "600 28px " + SANS;
@@ -480,14 +483,15 @@
       x.fillText(String(i + 1).padStart(2, "0"), M, y);
       x.fillStyle = INK; x.font = "700 32px " + SANS;
       x.fillText(fit(g.name, W - M * 2 - 280, "700 32px " + SANS), M + 62, y);
-      x.fillStyle = tcol[i]; x.font = "800 34px " + SANS;
+      x.fillStyle = tcol[i]; x.font = WD + " 34px " + SANS;
       x.textAlign = "right"; x.fillText(num(g.hours) + " ч", W - M, y); x.textAlign = "left";
     });
 
     // подпись
     x.fillStyle = "#5A5751"; x.font = "600 22px " + SANS;
     x.fillText("steam wrapped · сделано вручную", M, H - 66);
-  })();
+  }
+  redrawCard();
 
   /* ---------- скачать / скопировать ---------- */
 
@@ -515,6 +519,26 @@
         .catch(function () { say("Не вышло скопировать — скачай PNG"); });
     });
   });
+
+  /* ---------- временный переключатель шрифта ---------- */
+
+  (function fontbar() {
+    var bar = $("#fontbar");
+    if (!bar) return;
+    var saved = localStorage.getItem("sw-font") || document.documentElement.dataset.font || "grotesk";
+    apply(saved);
+
+    function apply(f) {
+      document.documentElement.dataset.font = f;
+      localStorage.setItem("sw-font", f);
+      $$("button", bar).forEach(function (b) { b.classList.toggle("is-on", b.dataset.f === f); });
+      redrawCard();
+    }
+    bar.addEventListener("click", function (e) {
+      var b = e.target.closest("button");
+      if (b) apply(b.dataset.f);
+    });
+  })();
 
   /* ---------- появление секций ---------- */
 

@@ -25,12 +25,44 @@
   --accent: var(--c1);   /* переопределяется посекционно */
 
   /* типографика */
-  --sans: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  /* --- стек по умолчанию: нейтральный гротеск --- */
+  --sans: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+  --display: var(--sans);
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --w-display: 700;        /* вес крупных цифр и заголовков */
+  --tight: -0.02em;        /* трекинг крупного текста */
 
   --radius: 4px;
   --max: 1180px;
   --section-pad: clamp(76px, 11vw, 168px);
+}
+
+/* ---------- пресеты шрифтов (переключаются data-font на <html>) ---------- */
+
+html[data-font="grotesk"] {
+  --sans: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+  --display: var(--sans);
+  --w-display: 700; --tight: -0.022em;
+}
+html[data-font="geo"] {
+  --sans: "Avenir Next", Avenir, "Century Gothic", "URW Gothic", "Trebuchet MS", sans-serif;
+  --display: var(--sans);
+  --w-display: 600; --tight: -0.005em;
+}
+html[data-font="system"] {
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --display: var(--sans);
+  --w-display: 700; --tight: -0.025em;
+}
+html[data-font="mixed"] {
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: "SFMono-Regular", "JetBrains Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  --w-display: 600; --tight: -0.04em;
+}
+html[data-font="book"] {
+  --sans: "Optima", "Gill Sans", "Gill Sans MT", Candara, "Trebuchet MS", sans-serif;
+  --display: var(--sans);
+  --w-display: 600; --tight: 0;
 }
 
 * { box-sizing: border-box; }
@@ -127,13 +159,14 @@ a:hover { color: var(--accent); }
 }
 
 .section-title {
-  font-weight: 800;
+  font-family: var(--display);
+  font-weight: var(--w-display);
   font-size: clamp(28px, 3.6vw, 46px);
   line-height: 1.08;
   margin: 0;
-  letter-spacing: -0.035em;
+  letter-spacing: var(--tight);
 }
-.section-title b { color: var(--accent); font-weight: 800; }
+.section-title b { color: var(--accent); font-weight: var(--w-display); }
 
 .section-note {
   margin-left: auto;
@@ -189,14 +222,15 @@ section { padding: var(--section-pad) 0; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 .hero__title {
-  font-weight: 800;
+  font-family: var(--display);
+  font-weight: var(--w-display);
   font-size: clamp(46px, 9vw, 112px);
   line-height: 0.94;
-  letter-spacing: -0.045em;
+  letter-spacing: var(--tight);
   margin: 14px 0 0;
 }
 .hero__title b {
-  font-weight: 800;
+  font-weight: var(--w-display);
   background: linear-gradient(96deg, var(--c1) 0%, var(--c4) 42%, var(--c2) 78%, var(--c5) 100%);
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
@@ -244,8 +278,8 @@ section { padding: var(--section-pad) 0; }
 .stat:hover { background: #111116; }
 
 .stat__value {
-  font-size: clamp(44px, 6.8vw, 88px); font-weight: 800; line-height: 1;
-  letter-spacing: -0.05em; display: flex; align-items: baseline; gap: 10px; color: var(--sc);
+  font-size: clamp(44px, 6.8vw, 88px); font-family: var(--display); font-weight: var(--w-display); line-height: 1;
+  letter-spacing: var(--tight); display: flex; align-items: baseline; gap: 10px; color: var(--sc);
 }
 .stat__unit { font-size: 14px; font-weight: 600; letter-spacing: 0; color: var(--ink-faint); }
 .stat__label { margin-top: 16px; color: var(--ink); }
@@ -258,10 +292,10 @@ section { padding: var(--section-pad) 0; }
 .soulmate { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
 @media (max-width: 900px) { .soulmate { grid-template-columns: 1fr; } }
 
-.soulmate__name { font-size: clamp(34px, 5.4vw, 64px); font-weight: 800; line-height: 1.0; letter-spacing: -0.04em; margin: 10px 0 0; }
+.soulmate__name { font-size: clamp(34px, 5.4vw, 64px); font-family: var(--display); font-weight: var(--w-display); line-height: 1.0; letter-spacing: var(--tight); margin: 10px 0 0; }
 
 .soulmate__hours {
-  font-size: clamp(70px, 12vw, 148px); font-weight: 800; line-height: 1; letter-spacing: -0.055em; margin: 22px 0 0;
+  font-size: clamp(70px, 12vw, 148px); font-family: var(--display); font-weight: var(--w-display); line-height: 1; letter-spacing: var(--tight); margin: 22px 0 0;
   background: linear-gradient(100deg, var(--c1), var(--c4));
   -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
 }
@@ -279,7 +313,7 @@ section { padding: var(--section-pad) 0; }
   transition: background .2s ease, padding-left .2s ease;
 }
 .fact:hover { background: rgba(255,255,255,0.03); padding-left: 12px; }
-.fact__num { font-size: clamp(26px, 3.1vw, 38px); font-weight: 800; line-height: 1; min-width: 4.6ch; letter-spacing: -0.04em; color: var(--fc, var(--c1)); }
+.fact__num { font-size: clamp(26px, 3.1vw, 38px); font-family: var(--display); font-weight: var(--w-display); line-height: 1; min-width: 4.6ch; letter-spacing: var(--tight); color: var(--fc, var(--c1)); }
 .fact:nth-child(6n+1) { --fc: var(--c1); }
 .fact:nth-child(6n+2) { --fc: var(--c4); }
 .fact:nth-child(6n+3) { --fc: var(--c3); }
@@ -311,7 +345,7 @@ section { padding: var(--section-pad) 0; }
   box-shadow: 0 0 20px -4px var(--bc);
   transition: width 1.1s cubic-bezier(.22,.85,.3,1);
 }
-.bar__value { font-size: clamp(19px, 2.3vw, 28px); font-weight: 800; letter-spacing: -0.04em; white-space: nowrap; }
+.bar__value { font-family: var(--display); font-size: clamp(19px, 2.3vw, 28px); font-weight: var(--w-display); letter-spacing: var(--tight); white-space: nowrap; }
 .bar__value span { font-size: 11px; font-weight: 600; color: var(--ink-faint); margin-left: 5px; letter-spacing: 0; }
 
 /* ---------- недавно играла ---------- */
@@ -322,7 +356,7 @@ section { padding: var(--section-pad) 0; }
 .rcard::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--rc, var(--c3)); opacity: .9; }
 .rcard:hover { background: #111116; }
 .rcard__name { font-size: 17px; font-weight: 700; }
-.rcard__big { font-size: clamp(32px, 4.2vw, 46px); font-weight: 800; line-height: 1; letter-spacing: -0.045em; color: var(--rc, var(--c3)); }
+.rcard__big { font-size: clamp(32px, 4.2vw, 46px); font-family: var(--display); font-weight: var(--w-display); line-height: 1; letter-spacing: var(--tight); color: var(--rc, var(--c3)); }
 .rcard__big span { font-size: 12px; font-weight: 600; color: var(--ink-faint); margin-left: 7px; letter-spacing: 0; }
 .rcard__meta { font-size: 12px; color: var(--ink-faint); margin-top: auto; padding-top: 12px; }
 
@@ -345,7 +379,7 @@ section { padding: var(--section-pad) 0; }
 .donut .donut__seg.is-hover { opacity: 1; stroke-width: 28; }
 
 .donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
-.donut-center__value { font-size: 42px; font-weight: 800; line-height: 1; letter-spacing: -0.045em; }
+.donut-center__value { font-size: 42px; font-family: var(--display); font-weight: var(--w-display); line-height: 1; letter-spacing: var(--tight); }
 .donut-center__label { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); margin-top: 8px; }
 
 .legend { display: grid; gap: 2px; }
@@ -356,7 +390,7 @@ section { padding: var(--section-pad) 0; }
 .legend__row:hover { background: rgba(255,255,255,0.03); }
 .legend__dot { width: 12px; height: 12px; border-radius: 3px; }
 .legend__name { font-size: 15px; font-weight: 600; }
-.legend__pct { font-size: 22px; font-weight: 800; letter-spacing: -0.04em; }
+.legend__pct { font-family: var(--display); font-size: 22px; font-weight: var(--w-display); letter-spacing: var(--tight); }
 .legend__hours { font-size: 12px; color: var(--ink-faint); min-width: 8ch; text-align: right; }
 
 /* ---------- судьба вечера ---------- */
@@ -375,7 +409,7 @@ section { padding: var(--section-pad) 0; }
 .fate__slot--empty { color: var(--ink-faint); font-size: 17px; font-weight: 600; text-align: center; align-items: center; }
 .fate__slot--empty::before { opacity: .25; }
 .fate__idx { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--fs); letter-spacing: .1em; }
-.fate__name { font-size: clamp(23px, 2.7vw, 31px); font-weight: 800; line-height: 1.1; letter-spacing: -0.035em; transition: opacity .18s ease, filter .18s ease; }
+.fate__name { font-size: clamp(23px, 2.7vw, 31px); font-family: var(--display); font-weight: var(--w-display); line-height: 1.1; letter-spacing: var(--tight); transition: opacity .18s ease, filter .18s ease; }
 .fate__tags { font-size: 12px; color: var(--ink-faint); }
 .fate__link { font-size: 12px; font-weight: 600; color: var(--ink-dim); border-bottom: 1px solid var(--line); align-self: flex-start; padding-bottom: 2px; }
 .fate__link:hover { color: var(--fs); border-color: var(--fs); }
@@ -440,3 +474,22 @@ section { padding: var(--section-pad) 0; }
   transition: opacity .25s ease, transform .25s ease; z-index: 50;
 }
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+
+/* ---------- временная панель выбора шрифта ---------- */
+.fontbar {
+  position: fixed; right: 16px; bottom: 16px; z-index: 60;
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  background: rgba(16,16,20,.92); border: 1px solid var(--line);
+  padding: 8px 10px; border-radius: 999px; backdrop-filter: blur(12px);
+  box-shadow: 0 14px 40px rgba(0,0,0,.55);
+}
+.fontbar__title { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); padding: 0 6px; }
+.fontbar button {
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  color: var(--ink-dim); background: transparent; border: 1px solid var(--line);
+  padding: 7px 12px; border-radius: 999px; transition: all .18s ease;
+}
+.fontbar button:hover { color: var(--ink); border-color: var(--ink-faint); }
+.fontbar button.is-on { background: var(--c1); border-color: var(--c1); color: #0A0A0C; font-weight: 700; }
+@media (max-width: 640px) { .fontbar { left: 12px; right: 12px; justify-content: center; } }

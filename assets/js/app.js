@@ -390,8 +390,7 @@
     var INK = "#F2F0EC", DIM = "#7C7871";
     var C1 = "#FF5C38", C2 = "#8B5CF6", C3 = "#22D3A5", C4 = "#FFC53D", C5 = "#4CC2FF";
     var css = getComputedStyle(document.documentElement);
-    var SANS = (css.getPropertyValue("--display") || "").trim() ||
-               'Helvetica, Arial, sans-serif';
+    var SANS = (css.getPropertyValue("--display") || "").trim() || 'Arial, sans-serif';
     var WD = (css.getPropertyValue("--w-display") || "700").trim();
 
     // фон + цветные пятна
@@ -432,12 +431,12 @@
     line(148);
 
     // ник
-    x.fillStyle = INK; x.font = WD + " 104px " + SANS;
-    x.fillText(fit(D.meta.persona || "profile", W - M * 2, WD + " 104px " + SANS), M, 288);
+    x.fillStyle = INK; x.font = WD + " 76px " + SANS;
+    x.fillText(fit(D.meta.persona || "profile", W - M * 2, WD + " 76px " + SANS), M, 288);
     var grad = x.createLinearGradient(M, 0, W - M, 0);
     grad.addColorStop(0, C1); grad.addColorStop(0.45, C4); grad.addColorStop(0.8, C2); grad.addColorStop(1, C5);
-    x.fillStyle = grad; x.font = WD + " 104px " + SANS;
-    x.fillText("в цифрах.", M, 398);
+    x.fillStyle = grad; x.font = WD + " 76px " + SANS;
+    x.fillText("в цифрах.", M, 386);
 
     // три цифры
     var cols = [
@@ -450,7 +449,7 @@
     cols.forEach(function (col, i) {
       var cx = M + colW * i;
       x.fillStyle = col[2]; x.fillRect(cx, 512, 46, 5);
-      x.fillStyle = col[2]; x.font = WD + " 88px " + SANS;
+      x.fillStyle = col[2]; x.font = WD + " 64px " + SANS;
       x.fillText(col[0], cx, 606);
       x.fillStyle = DIM; x.font = "600 24px " + SANS;
       x.fillText(col[1], cx, 648);
@@ -460,13 +459,13 @@
     // игра жизни
     if (soulmate) {
       label("ГЛАВНАЯ ИГРА ЖИЗНИ", 772, C1);
-      x.fillStyle = INK; x.font = WD + " 74px " + SANS;
-      x.fillText(fit(soulmate.name, W - M * 2, WD + " 74px " + SANS), M, 858);
+      x.fillStyle = INK; x.font = WD + " 46px " + SANS;
+      x.fillText(fit(soulmate.name, W - M * 2, WD + " 46px " + SANS), M, 858);
 
       var hh = num(soulmate.hours);
       var g2 = x.createLinearGradient(M, 0, W * 0.8, 0);
       g2.addColorStop(0, C1); g2.addColorStop(1, C4);
-      x.fillStyle = g2; x.font = WD + " 148px " + SANS;
+      x.fillStyle = g2; x.font = WD + " 104px " + SANS;
       x.fillText(hh, M, 1002);
       var w = x.measureText(hh).width;
       x.fillStyle = DIM; x.font = "600 28px " + SANS;
@@ -479,11 +478,11 @@
     var tcol = [C1, C4, C3];
     played.slice(0, 3).forEach(function (g, i) {
       var y = 1192 + i * 54;
-      x.fillStyle = tcol[i]; x.font = "700 26px " + SANS;
+      x.fillStyle = tcol[i]; x.font = "700 20px " + SANS;
       x.fillText(String(i + 1).padStart(2, "0"), M, y);
-      x.fillStyle = INK; x.font = "700 32px " + SANS;
-      x.fillText(fit(g.name, W - M * 2 - 280, "700 32px " + SANS), M + 62, y);
-      x.fillStyle = tcol[i]; x.font = WD + " 34px " + SANS;
+      x.fillStyle = INK; x.font = "700 24px " + SANS;
+      x.fillText(fit(g.name, W - M * 2 - 280, "700 24px " + SANS), M + 62, y);
+      x.fillStyle = tcol[i]; x.font = WD + " 26px " + SANS;
       x.textAlign = "right"; x.fillText(num(g.hours) + " ч", W - M, y); x.textAlign = "left";
     });
 
@@ -492,6 +491,7 @@
     x.fillText("steam wrapped · сделано вручную", M, H - 66);
   }
   redrawCard();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawCard);
 
   /* ---------- скачать / скопировать ---------- */
 
@@ -519,26 +519,6 @@
         .catch(function () { say("Не вышло скопировать — скачай PNG"); });
     });
   });
-
-  /* ---------- временный переключатель шрифта ---------- */
-
-  (function fontbar() {
-    var bar = $("#fontbar");
-    if (!bar) return;
-    var saved = localStorage.getItem("sw-font") || document.documentElement.dataset.font || "grotesk";
-    apply(saved);
-
-    function apply(f) {
-      document.documentElement.dataset.font = f;
-      localStorage.setItem("sw-font", f);
-      $$("button", bar).forEach(function (b) { b.classList.toggle("is-on", b.dataset.f === f); });
-      redrawCard();
-    }
-    bar.addEventListener("click", function (e) {
-      var b = e.target.closest("button");
-      if (b) apply(b.dataset.f);
-    });
-  })();
 
   /* ---------- появление секций ---------- */
 

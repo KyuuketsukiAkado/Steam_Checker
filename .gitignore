@@ -1,0 +1,11 @@
+# ключи и секреты
+steam_key.txt
+*.key
+
+# кэш скрипта
+.cache/
+__pycache__/
+
+# системное
+.DS_Store
+Thumbs.db

@@ -78,7 +78,7 @@
   $("#brandName").textContent = D.meta.persona || "—";
   $("#year").textContent = new Date().getFullYear();
   $("#heroEyebrow").textContent = "Личная статистика · данные от " + fmtDate(D.meta.generatedAt);
-  $$(".hero__title")[0].innerHTML = (D.meta.persona || "profile") + "<br><em>в цифрах.</em>";
+  $$(".hero__title")[0].innerHTML = (D.meta.persona || "profile") + "<br><b>в цифрах.</b>";
 
   var pl = $("#profileLink");
   if (D.meta.profileUrl) pl.href = D.meta.profileUrl; else pl.style.display = "none";
@@ -146,7 +146,7 @@
       num(hours2w) + " часов за две недели",
       "и это только Steam"
     ].filter(Boolean);
-    var line = items.map(function (t) { return "<span>✦ <b>·</b> " + t + "</span>"; }).join("");
+    var line = items.map(function (t) { return "<span><i>✦</i>" + t + "</span>"; }).join("");
     $("#marquee").innerHTML = line + line; // дубль для бесшовной прокрутки
   })();
 
@@ -186,9 +186,13 @@
     if (!top.length) return;
     var max = top[0].hours;
     var wrap = $("#bars");
+    var ramp = ["#FF5C38", "#FF8A3D", "#FFC53D", "#B6D93F", "#22D3A5",
+                "#2BC7C7", "#4CC2FF", "#6E9CFF", "#8B5CF6", "#B45CF6"];
 
     top.forEach(function (g, i) {
       var row = el("div", "bar");
+      row.style.setProperty("--bc", ramp[i % ramp.length]);
+      row.style.setProperty("--bc2", ramp[(i + 1) % ramp.length]);
       row.appendChild(el("div", "bar__rank", String(i + 1).padStart(2, "0")));
 
       var body = el("div", "bar__body");
@@ -236,8 +240,10 @@
       return;
     }
 
+    var rc = ["#22D3A5", "#4CC2FF", "#FFC53D", "#8B5CF6"];
     list.forEach(function (g, i) {
       var card = el("div", "rcard");
+      card.style.setProperty("--rc", rc[i % rc.length]);
       var d = daysAgo(g.lastPlayed);
       card.innerHTML =
         "<div class='eyebrow'>" + (i === 0 ? "<span class='pulse'></span>главное занятие" : "также в ротации") + "</div>" +
@@ -278,7 +284,7 @@
     if (!sum) return;
 
     var R = 78, C = 2 * Math.PI * R, off = 0;
-    var palette = ["#FF5C38", "#F0F0EC", "#8E8A82", "#FFA184", "#5C5852", "#C9C5BD", "#3A3733"];
+    var palette = ["#FF5C38", "#8B5CF6", "#22D3A5", "#FFC53D", "#4CC2FF", "#FF8AB4", "#5F5B55"];
 
     var ns = "http://www.w3.org/2000/svg";
     genreData.forEach(function (g, i) {
@@ -381,95 +387,106 @@
   (function drawCard() {
     var c = shareCanvas, x = c.getContext("2d");
     var W = c.width, H = c.height;
-    var ACCENT = "#FF5C38", INK = "#EDEAE4", DIM = "#7C7871";
-    var SERIF = '"Iowan Old Style", Palatino, Georgia, "Times New Roman", serif';
-    var SANS = 'Inter, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+    var INK = "#F2F0EC", DIM = "#7C7871";
+    var C1 = "#FF5C38", C2 = "#8B5CF6", C3 = "#22D3A5", C4 = "#FFC53D", C5 = "#4CC2FF";
+    var SANS = 'Inter, "Segoe UI", -apple-system, Roboto, Helvetica, Arial, sans-serif';
 
-    // фон
-    x.fillStyle = "#0B0B0C"; x.fillRect(0, 0, W, H);
-    var glow = x.createRadialGradient(W / 2, 0, 0, W / 2, 0, H * 0.75);
-    glow.addColorStop(0, "rgba(255,92,56,0.20)");
-    glow.addColorStop(1, "rgba(255,92,56,0)");
-    x.fillStyle = glow; x.fillRect(0, 0, W, H);
+    // фон + цветные пятна
+    x.fillStyle = "#0A0A0C"; x.fillRect(0, 0, W, H);
+    function blob(cx, cy, r, color) {
+      var g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, color); g.addColorStop(1, "rgba(0,0,0,0)");
+      x.fillStyle = g; x.fillRect(0, 0, W, H);
+    }
+    blob(W * 0.10, H * 0.02, W * 0.85, "rgba(255,92,56,0.30)");
+    blob(W * 0.95, H * 0.20, W * 0.70, "rgba(139,92,246,0.24)");
+    blob(W * 0.10, H * 0.95, W * 0.75, "rgba(76,194,255,0.18)");
+    blob(W * 0.85, H * 0.80, W * 0.60, "rgba(34,211,165,0.14)");
 
     var M = 88;
 
     function line(y) {
-      x.strokeStyle = "rgba(255,255,255,0.12)"; x.lineWidth = 1;
+      x.strokeStyle = "rgba(255,255,255,0.14)"; x.lineWidth = 1;
       x.beginPath(); x.moveTo(M, y + 0.5); x.lineTo(W - M, y + 0.5); x.stroke();
     }
     function label(t, y, color) {
-      x.fillStyle = color || DIM;
-      x.font = "500 22px " + SANS;
-      x.letterSpacing = "4px";
+      x.fillStyle = color || DIM; x.font = "700 22px " + SANS;
+      if ("letterSpacing" in x) x.letterSpacing = "4px";
       x.fillText(t.toUpperCase(), M, y);
-      x.letterSpacing = "0px";
+      if ("letterSpacing" in x) x.letterSpacing = "0px";
+    }
+    function fit(t, maxW, font) {
+      x.font = font;
+      var s2 = t;
+      while (x.measureText(s2).width > maxW && s2.length > 4) s2 = s2.slice(0, -2);
+      return s2 === t ? t : s2 + "…";
     }
 
     // шапка
-    label("STEAM WRAPPED", 120);
-    x.fillStyle = ACCENT; x.font = "500 22px " + SANS;
-    x.textAlign = "right"; x.fillText((D.meta.generatedAt || "").slice(0, 7), W - M, 120); x.textAlign = "left";
-    line(150);
+    label("STEAM WRAPPED", 118);
+    x.fillStyle = C4; x.font = "700 22px " + SANS;
+    x.textAlign = "right"; x.fillText((D.meta.generatedAt || "").slice(0, 7), W - M, 118); x.textAlign = "left";
+    line(148);
 
     // ник
-    x.fillStyle = INK; x.font = "96px " + SERIF;
-    x.fillText(D.meta.persona || "profile", M, 280);
-    x.fillStyle = ACCENT; x.font = "italic 96px " + SERIF;
-    x.fillText("в цифрах.", M, 386);
+    x.fillStyle = INK; x.font = "800 104px " + SANS;
+    x.fillText(fit(D.meta.persona || "profile", W - M * 2, "800 104px " + SANS), M, 288);
+    var grad = x.createLinearGradient(M, 0, W - M, 0);
+    grad.addColorStop(0, C1); grad.addColorStop(0.45, C4); grad.addColorStop(0.8, C2); grad.addColorStop(1, C5);
+    x.fillStyle = grad; x.font = "800 104px " + SANS;
+    x.fillText("в цифрах.", M, 398);
 
     // три цифры
     var cols = [
-      [num(gamesOwned), "игр"],
-      [num(totalHours), "часов"],
-      [num(hours2w), "ч / 2 нед"]
+      [num(gamesOwned), "игр", C1],
+      [num(totalHours), "часов", C4],
+      [num(hours2w), "ч / 2 нед", C3]
     ];
     var colW = (W - M * 2) / 3;
-    line(470);
+    line(478);
     cols.forEach(function (col, i) {
       var cx = M + colW * i;
-      x.fillStyle = INK; x.font = "84px " + SERIF;
-      x.fillText(col[0], cx, 580);
-      x.fillStyle = DIM; x.font = "400 24px " + SANS;
-      x.fillText(col[1], cx, 624);
+      x.fillStyle = col[2]; x.fillRect(cx, 512, 46, 5);
+      x.fillStyle = col[2]; x.font = "800 88px " + SANS;
+      x.fillText(col[0], cx, 606);
+      x.fillStyle = DIM; x.font = "600 24px " + SANS;
+      x.fillText(col[1], cx, 648);
     });
-    line(690);
+    line(706);
 
     // игра жизни
     if (soulmate) {
-      label("ГЛАВНАЯ ИГРА ЖИЗНИ", 760);
-      x.fillStyle = INK; x.font = "72px " + SERIF;
-      var nm = soulmate.name;
-      while (x.measureText(nm).width > W - M * 2 && nm.length > 4) nm = nm.slice(0, -2);
-      if (nm !== soulmate.name) nm += "…";
-      x.fillText(nm, M, 850);
+      label("ГЛАВНАЯ ИГРА ЖИЗНИ", 772, C1);
+      x.fillStyle = INK; x.font = "800 74px " + SANS;
+      x.fillText(fit(soulmate.name, W - M * 2, "800 74px " + SANS), M, 858);
 
-      x.fillStyle = ACCENT; x.font = "140px " + SERIF;
       var hh = num(soulmate.hours);
-      x.fillText(hh, M, 990);
+      var g2 = x.createLinearGradient(M, 0, W * 0.8, 0);
+      g2.addColorStop(0, C1); g2.addColorStop(1, C4);
+      x.fillStyle = g2; x.font = "800 148px " + SANS;
+      x.fillText(hh, M, 1002);
       var w = x.measureText(hh).width;
-      x.fillStyle = DIM; x.font = "400 28px " + SANS;
-      x.fillText("часов = " + dec(soulmate.hours / 24, 1) + " дней нон-стоп", M + w + 22, 990);
-      line(1050);
+      x.fillStyle = DIM; x.font = "600 28px " + SANS;
+      x.fillText("часов = " + dec(soulmate.hours / 24, 1) + " дней нон-стоп", M + w + 22, 1002);
+      line(1062);
     }
 
     // топ-3
-    label("ТОП-3 ПО ЧАСАМ", 1118);
+    label("ТОП-3 ПО ЧАСАМ", 1128, C5);
+    var tcol = [C1, C4, C3];
     played.slice(0, 3).forEach(function (g, i) {
-      var y = 1180 + i * 52;
-      x.fillStyle = DIM; x.font = "400 26px " + SANS;
+      var y = 1192 + i * 54;
+      x.fillStyle = tcol[i]; x.font = "700 26px " + SANS;
       x.fillText(String(i + 1).padStart(2, "0"), M, y);
-      x.fillStyle = INK; x.font = "400 30px " + SANS;
-      var nm2 = g.name;
-      while (x.measureText(nm2).width > W - M * 2 - 260 && nm2.length > 4) nm2 = nm2.slice(0, -2);
-      x.fillText(nm2, M + 60, y);
-      x.fillStyle = ACCENT; x.font = "34px " + SERIF;
+      x.fillStyle = INK; x.font = "700 32px " + SANS;
+      x.fillText(fit(g.name, W - M * 2 - 280, "700 32px " + SANS), M + 62, y);
+      x.fillStyle = tcol[i]; x.font = "800 34px " + SANS;
       x.textAlign = "right"; x.fillText(num(g.hours) + " ч", W - M, y); x.textAlign = "left";
     });
 
     // подпись
-    x.fillStyle = "#5A5751"; x.font = "400 22px " + SANS;
-    x.fillText("steam wrapped · сделано вручную", M, H - 70);
+    x.fillStyle = "#5A5751"; x.font = "600 22px " + SANS;
+    x.fillText("steam wrapped · сделано вручную", M, H - 66);
   })();
 
   /* ---------- скачать / скопировать ---------- */

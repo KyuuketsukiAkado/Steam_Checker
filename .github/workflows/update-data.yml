@@ -1,0 +1,76 @@
+name: Обновить мою статистику
+
+# Раз в сутки обновляет data.js, аватар и og-картинку владельца.
+# Ключ лежит в секретах (Settings → Secrets and variables → Actions →
+# New repository secret → имя STEAM_API_KEY), в коде его нет.
+on:
+  schedule:
+    # 04:20 UTC — ночь по Минску, Steam не загружен
+    - cron: "20 4 * * *"
+  workflow_dispatch:
+    inputs:
+      refresh_genres:
+        description: "Перетянуть жанры заново (медленно)"
+        type: boolean
+        default: false
+
+# нужно право писать в репозиторий: воркфлоу коммитит свежие данные
+permissions:
+  contents: write
+
+concurrency:
+  group: steam-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Забрать репозиторий
+        uses: actions/checkout@v4
+
+      - name: Поставить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Проверить, что ключ на месте
+        env:
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+        run: |
+          if [ -z "$STEAM_API_KEY" ]; then
+            echo "::error::Нет секрета STEAM_API_KEY. Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "Ключ на месте, ${#STEAM_API_KEY} символов."
+
+      - name: Собрать данные
+        env:
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+        run: |
+          python fetch_data.py --user K_Ak4d0 \
+            ${{ inputs.refresh_genres && '--refresh-genres' || '' }}
+
+      - name: Перерисовать og-картинку
+        run: |
+          python -m pip install --quiet pillow fonttools brotli
+          python tools/make_og.py
+
+      - name: Закоммитить изменения
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # .bak — рабочий файл скрипта, в репозитории ему делать нечего
+          rm -f assets/js/data.js.bak
+
+          git add assets/js/data.js assets/img/avatar.jpg \
+                  assets/img/og.png assets/data/genres.json
+          if git diff --cached --quiet; then
+            echo "Данные не изменились — коммит не нужен."
+            exit 0
+          fi
+          git commit -m "data: автообновление статистики Steam"
+          git push

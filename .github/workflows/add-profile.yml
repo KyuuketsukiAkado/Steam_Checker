@@ -1,0 +1,103 @@
+name: Собрать карточку друга
+
+# Собирает страницу для чужого профиля моим ключом.
+# Запуск: вкладка Actions → «Собрать карточку друга» → Run workflow →
+# вписать SteamID64 (17 цифр), ник или ссылку на профиль.
+#
+# Друзьям не нужен ни форк, ни свой ключ — только их SteamID.
+on:
+  workflow_dispatch:
+    inputs:
+      steamid:
+        description: "SteamID64 (17 цифр), ник или ссылка на профиль"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: steam-profile
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Забрать репозиторий
+        uses: actions/checkout@v4
+
+      - name: Поставить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Проверить ввод
+        env:
+          RAW: ${{ inputs.steamid }}
+        run: |
+          if [ -z "${RAW// /}" ]; then
+            echo "::error::Пустой ввод. Нужен SteamID64, ник или ссылка на профиль."
+            exit 1
+          fi
+          echo "Запрошен профиль: $RAW"
+
+      - name: Собрать данные профиля
+        id: fetch
+        env:
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          RAW: ${{ inputs.steamid }}
+        run: |
+          set +e
+          # --extra 0: extra_games.json это личный файл владельца (Dota),
+          # чужим профилям его подмешивать нельзя
+          python fetch_data.py --user "$RAW" --profile --extra 0 | tee run.log
+          code=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$code" = "3" ]; then
+            echo "::error::Профиль закрыт. В Steam: Профиль → Настройки приватности → «Игровые данные» = Открытый доступ, затем повторите запуск."
+            exit 1
+          fi
+          if [ "$code" != "0" ]; then
+            echo "::error::Не удалось собрать профиль (код $code). Подробности в логе шага."
+            exit "$code"
+          fi
+
+          # ссылку на готовую страницу достаём из лога скрипта
+          url=$(grep -oE 'https://[^ ]+/u/[0-9]+/' run.log | tail -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          rm -f run.log
+
+      - name: Закоммитить страницу
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          rm -f assets/data/*.js.bak
+
+          git add assets/data u assets/img
+          if git diff --cached --quiet; then
+            echo "Ничего не изменилось."
+            exit 0
+          fi
+          git commit -m "data: карточка профиля ${{ inputs.steamid }}"
+
+          # страницу мог параллельно собрать другой запуск — подхватываем и повторяем
+          for i in 1 2 3; do
+            git pull --rebase --autostash && git push && break
+            echo "Повтор push ($i)…"
+            sleep 5
+          done
+
+      - name: Показать ссылку
+        run: |
+          {
+            echo "### Карточка готова"
+            echo ""
+            echo "${{ steps.fetch.outputs.url }}"
+            echo ""
+            echo "GitHub Pages обновляет сайт минуту-другую после коммита."
+          } >> "$GITHUB_STEP_SUMMARY"

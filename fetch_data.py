@@ -118,7 +118,9 @@ def clean_name(name):
     n = html.unescape(name or "").strip()
     n = re.sub(r"[™®©]", "", n)
     n = EDITION_RE.sub("", n)
-    n = re.sub(r"\s{2,}", " ", n).strip(" -–—:")
+    n = re.sub(r"\s{2,}", " ", n)
+    # после срезки суффикса остаётся хвост пунктуации: «The Witcher:» → «The Witcher»
+    n = n.strip(" -–—:,")
     return n
 
 

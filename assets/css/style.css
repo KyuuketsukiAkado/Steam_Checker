@@ -278,6 +278,16 @@ section { padding: var(--section-pad) 0; }
 .sec--c5 .btn--solid:hover { box-shadow: 0 16px 40px rgba(76, 194, 255, 0.36); }
 .btn[disabled] { opacity: .5; cursor: progress; transform: none; }
 
+/* Клавиатурная навигация: рамку видно только при ходьбе по Tab,
+   мышкой она не мозолит глаза. Цвет — акцент текущей секции. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.btn:focus-visible { outline-offset: 4px; }
+.share__caption textarea:focus-visible { outline-offset: 1px; }
+
 /* ---------- главные цифры ---------- */
 
 .stats {
@@ -495,6 +505,10 @@ section { padding: var(--section-pad) 0; }
 .share__caption summary::before { content: "＋ "; }
 .share__caption[open] summary::before { content: "− "; }
 .share__caption summary:hover { color: var(--accent); }
+.share__caption-label {
+  display: block; margin-top: 10px;
+  font-size: 12.5px; color: var(--ink-faint); line-height: 1.4;
+}
 .share__caption textarea {
   width: 100%; margin-top: 8px; resize: vertical;
   background: #0C0C0F; color: var(--ink); border: 1px solid var(--line);
@@ -596,6 +610,12 @@ section { padding: var(--section-pad) 0; }
 
   .rcard { padding: 20px 18px; }
   .rcard__name { font-size: 15.5px; }
+
+  /* три кнопки сетей в ряд не помещаются: делим на равные колонки,
+     чтобы не болталась одинокая кнопка на второй строке */
+  .share__nets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .share__nets .btn--net { padding: 12px 6px 12px 26px; font-size: 12px; text-align: left; }
+  .share__nets .btn--net::before { left: 10px; width: 8px; height: 8px; margin-top: -4px; }
 
   .legend__row { grid-template-columns: 10px 1fr auto auto; gap: 10px; padding: 11px 4px 11px 0; }
   .legend__pct { font-size: 15px; }

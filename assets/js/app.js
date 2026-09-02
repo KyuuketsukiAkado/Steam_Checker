@@ -38,18 +38,30 @@
     return e;
   }
 
+  function parseDate(iso) {
+    if (!iso) return null;
+    // даты без времени парсим как локальный полдень, чтобы не уезжать на день
+    // в зависимости от часового пояса зрителя
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    var d = m ? new Date(+m[1], +m[2] - 1, +m[3], 12, 0, 0) : new Date(iso);
+    return isNaN(d) ? null : d;
+  }
+
   function fmtDate(iso) {
-    if (!iso) return "—";
-    var d = new Date(iso);
-    if (isNaN(d)) return "—";
+    var d = parseDate(iso);
+    if (!d) return "—";
     return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
   }
 
   function daysAgo(iso) {
-    if (!iso) return null;
-    var d = new Date(iso);
-    if (isNaN(d)) return null;
+    var d = parseDate(iso);
+    if (!d) return null;
     return Math.max(0, Math.round((Date.now() - d.getTime()) / 86400000));
+  }
+
+  // 0.1 часа не должны превращаться в «0»: маленьким числам оставляем десятые
+  function smartDec(n) {
+    return dec(n, n >= 10 ? 0 : 1);
   }
 
   /* ---------- разбор данных ---------- */
@@ -142,12 +154,12 @@
   (function marquee() {
     var h = soulmate ? soulmate.hours : totalHours;
     var items = [
-      num(gamesOwned) + " игр в библиотеке",
-      num(totalHours) + " часов всего",
-      dec(totalHours / 24, 0) + " дней нон-стоп",
-      num(neverPlayed) + " игр не запущены ни разу",
+      num(gamesOwned) + " " + plural(gamesOwned, ["игра", "игры", "игр"]) + " в библиотеке",
+      num(totalHours) + " " + plural(totalHours, ["час", "часа", "часов"]) + " всего",
+      dec(totalHours / 24, 0) + " " + plural(totalHours / 24, ["день", "дня", "дней"]) + " нон-стоп",
+      num(neverPlayed) + " " + plural(neverPlayed, ["игра", "игры", "игр"]) + " не запущены ни разу",
       soulmate ? soulmate.name + " — " + num(h) + " ч" : "",
-      num(hours2w) + " часов за две недели",
+      num(hours2w) + " " + plural(hours2w, ["час", "часа", "часов"]) + " за две недели",
       D.meta.memberSince ? "в Steam с " + new Date(D.meta.memberSince).getFullYear() + " года" : "",
       "и это только Steam"
     ].filter(Boolean);
@@ -170,7 +182,7 @@
       [dec(h / 8760 * 100, 1) + "%", "календарного <b>года жизни</b>"],
       [num(h / 11.4),         "<b>трилогий «Властелин колец»</b> в режиссёрской версии"],
       [dec(h / 600, 1),       "<b>иностранных языков</b> до уверенного B2 (600 ч каждый)"],
-      [num(h * 5),            "<b>километров</b> пешком, если бы шла вместо игры — это Минск → Токио"],
+      [num(h * 5),            "<b>километров</b> пешком, если бы шла вместо игры — это дальше, чем от Минска до Токио"],
       [num(h * 60 / 2.5),     "<b>раундов</b>, если считать по 2,5 минуты на каждый"],
       [dec(h / 3.5, 0),       "<b>марафонов</b> можно было бы пробежать (по 3,5 ч)"]
     ];
@@ -287,10 +299,10 @@
       card.innerHTML =
         "<div class='eyebrow'>" + (i === 0 ? "<span class='pulse'></span>главное занятие" : "также в ротации") + "</div>" +
         "<div class='rcard__name'>" + g.name + "</div>" +
-        "<div class='rcard__big'>" + dec(g.hours2w || 0, 0) + "<span>ч за 2 недели</span></div>" +
+        "<div class='rcard__big'>" + smartDec(g.hours2w || 0) + "<span>ч за 2 недели</span></div>" +
         "<div class='rcard__meta'>" +
           (d === null ? "" : (d === 0 ? "играла сегодня" : d + " " + plural(d, ["день", "дня", "дней"]) + " назад")) +
-          " · всего " + num(g.hours) + " ч</div>";
+          " · всего " + smartDec(g.hours) + " ч</div>";
       wrap.appendChild(card);
     });
   })();
@@ -351,7 +363,7 @@
       var dot = el("span", "legend__dot"); dot.style.background = palette[i % palette.length];
       row.appendChild(dot);
       row.appendChild(el("span", "legend__name", g.name));
-      row.appendChild(el("span", "legend__pct", dec(frac * 100, 0) + "%"));
+      row.appendChild(el("span", "legend__pct", pctStr(frac * 100) + "%"));
       row.appendChild(el("span", "legend__hours", num(g.hours) + " ч"));
       legend.appendChild(row);
 
@@ -365,6 +377,10 @@
     var defaultValue = String(genreData.length), defaultLabel = plural(genreData.length, ["жанр", "жанра", "жанров"]);
     dv.textContent = defaultValue; dl.textContent = defaultLabel;
 
+    function pctStr(p) {
+      return dec(p, p < 1 ? 1 : 0);
+    }
+
     function highlight(i, g) {
       $$(".donut__seg", svg).forEach(function (s) { s.classList.remove("is-hover"); });
       if (i === null) {
@@ -374,7 +390,7 @@
       }
       svg.classList.add("has-hover");
       svg.querySelector('.donut__seg[data-i="' + i + '"]').classList.add("is-hover");
-      dv.textContent = dec(g.hours / sum * 100, 0) + "%";
+      dv.textContent = pctStr(g.hours / sum * 100) + "%";
       dl.textContent = g.name;
     }
   })();

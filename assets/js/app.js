@@ -365,20 +365,57 @@
     var palette = ["#FF5C38", "#8B5CF6", "#22D3A5", "#FFC53D", "#4CC2FF",
                    "#FF8AB4", "#FF8A3D", "#6E9CFF", "#5F5B55"];
 
+    /* Минимальная дуга. Симулятор и MMO — это 0,4% и 0,1%: их доля
+       короче зазора между сегментами, дуга получалась отрицательной
+       и жанр просто не рисовался. Даём каждому видимый минимум и
+       забираем добавку у самых крупных, чтобы сумма осталась целой. */
+    var GAP = 2, MINARC = 7;
+    var arcs = genreData.map(function (g) { return g.hours / sum * C; });
+    var debt = 0;
+    arcs = arcs.map(function (a) {
+      if (a < MINARC) { debt += MINARC - a; return MINARC; }
+      return a;
+    });
+    if (debt > 0) {
+      var big = arcs.reduce(function (s, a) { return s + (a > MINARC ? a : 0); }, 0);
+      arcs = arcs.map(function (a) { return a > MINARC ? a - debt * (a / big) : a; });
+    }
+
     var ns = "http://www.w3.org/2000/svg";
     genreData.forEach(function (g, i) {
       var frac = g.hours / sum;
+      var arc = arcs[i];
       var c = document.createElementNS(ns, "circle");
       c.setAttribute("class", "donut__seg");
       c.setAttribute("cx", 100); c.setAttribute("cy", 100); c.setAttribute("r", R);
       c.setAttribute("fill", "none");
       c.setAttribute("stroke", palette[i % palette.length]);
       c.setAttribute("stroke-width", 22);
-      c.setAttribute("stroke-dasharray", (frac * C - 2).toFixed(2) + " " + C);
+      c.setAttribute("stroke-dasharray", Math.max(arc - GAP, 1.5).toFixed(2) + " " + C);
       c.setAttribute("stroke-dashoffset", (-off).toFixed(2));
       c.dataset.i = i;
       svg.appendChild(c);
-      off += frac * C;
+
+      /* Подпись прямо на кольце — жанр виден без наведения.
+         Ставим только там, где сегмент достаточно широкий. */
+      if (arc >= 20) {
+        var mid = (off + arc / 2) / C * 360 - 90;   // svg повёрнут на -90°
+        var rad = mid * Math.PI / 180;
+        var t = document.createElementNS(ns, "text");
+        t.setAttribute("class", "donut__cap");
+        t.setAttribute("x", (100 + Math.cos(rad) * R).toFixed(1));
+        t.setAttribute("y", (100 + Math.sin(rad) * R).toFixed(1));
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("dominant-baseline", "central");
+        t.setAttribute("transform", "rotate(90 " +
+          (100 + Math.cos(rad) * R).toFixed(1) + " " +
+          (100 + Math.sin(rad) * R).toFixed(1) + ")");
+        t.dataset.i = i;
+        t.textContent = arc >= 60 ? g.name : dec(frac * 100, 0) + "%";
+        svg.appendChild(t);
+      }
+
+      off += arc;
 
       var row = el("div", "legend__row");
       row.dataset.i = i;
@@ -405,6 +442,8 @@
 
     function highlight(i, g) {
       $$(".donut__seg", svg).forEach(function (s) { s.classList.remove("is-hover"); });
+      $$(".donut__cap", svg).forEach(function (s) { s.classList.remove("is-hover"); });
+      $$(".legend__row", legend).forEach(function (r) { r.classList.remove("is-hover"); });
       if (i === null) {
         svg.classList.remove("has-hover");
         dv.textContent = defaultValue; dl.textContent = defaultLabel;
@@ -412,6 +451,10 @@
       }
       svg.classList.add("has-hover");
       svg.querySelector('.donut__seg[data-i="' + i + '"]').classList.add("is-hover");
+      var cap = svg.querySelector('.donut__cap[data-i="' + i + '"]');
+      if (cap) cap.classList.add("is-hover");
+      var lrow = legend.querySelector('.legend__row[data-i="' + i + '"]');
+      if (lrow) lrow.classList.add("is-hover");
       dv.textContent = pctStr(g.hours / sum * 100) + "%";
       dl.textContent = g.name;
     }

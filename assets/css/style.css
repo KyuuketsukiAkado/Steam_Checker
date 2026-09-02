@@ -409,6 +409,21 @@ section { padding: var(--section-pad) 0; }
 .donut.has-hover .donut__seg { opacity: .22; }
 .donut .donut__seg.is-hover { opacity: 1; stroke-width: 28; }
 
+/* подписи прямо на кольце: жанры читаются сразу, без наведения.
+   Текст развёрнут обратно, потому что сам svg повёрнут на -90°. */
+.donut__cap {
+  font-family: var(--sans);
+  font-size: 7.5px;
+  font-weight: 800;
+  fill: #0A0A0C;
+  paint-order: stroke;
+  pointer-events: none;
+  letter-spacing: -0.01em;
+  transition: opacity .25s ease;
+}
+.donut.has-hover .donut__cap { opacity: .25; }
+.donut .donut__cap.is-hover { opacity: 1; }
+
 .donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
 .donut-center__value { font-size: 42px; font-family: var(--display); font-weight: var(--w-display); line-height: 1; letter-spacing: var(--tight); }
 .donut-center__label { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); margin-top: 8px; }
@@ -418,7 +433,10 @@ section { padding: var(--section-pad) 0; }
   display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 14px;
   padding: 13px 8px 13px 2px; border-bottom: 1px solid var(--line-soft); transition: background .2s ease;
 }
-.legend__row:hover { background: rgba(255,255,255,0.03); }
+.legend__row:hover,
+.legend__row.is-hover { background: rgba(255,255,255,0.05); }
+/* наведение на кольцо подсвечивает и строку легенды */
+.legend__row.is-hover .legend__name { color: var(--ink); font-weight: 700; }
 .legend__dot { width: 12px; height: 12px; border-radius: 3px; }
 .legend__name { font-size: 15px; font-weight: 600; }
 .legend__pct { font-family: var(--display); font-size: 17px; font-weight: var(--w-display); letter-spacing: var(--tight); }

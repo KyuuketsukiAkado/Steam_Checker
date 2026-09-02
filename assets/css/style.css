@@ -66,6 +66,20 @@
   --section-pad: clamp(76px, 11vw, 168px);
 }
 
+/* Крупные цифры набираются моноширинными знаками: при пересчёте
+   счётчиков ширина не скачет и строка не дёргается. */
+.stat__value,
+.soulmate__hours,
+.fact__num,
+.bar__value,
+.rcard__big,
+.donut-center__value,
+.legend__pct,
+.legend__hours {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 
@@ -511,8 +525,22 @@ section { padding: var(--section-pad) 0; }
 
   .soulmate__hours { font-size: clamp(40px, 13vw, 64px); }
   .soulmate__name { overflow-wrap: anywhere; }
+  /* «часов» рядом с числом — с отдельной строки, иначе 2 848,8 + подпись
+     не помещаются в одну строку и Unbounded вылезает за край */
+  .soulmate__hours span:last-child { display: block; margin-top: 4px; }
   .fact { grid-template-columns: minmax(4.2ch, auto) 1fr; gap: 12px; }
   .fact__text { font-size: 13.5px; }
+  /* 63 144 раунда — самое длинное число на странице, ему нужен потолок */
+  .fact__num { font-size: 17px; }
+
+  /* центр донута: 42px были фиксированы и наезжали на кольцо */
+  .donut-center__value { font-size: clamp(30px, 9vw, 42px); }
+  .donut-center__label { font-size: 10px; letter-spacing: .1em; }
+
+  /* заголовки секций и бегущая строка */
+  .section-title { font-size: clamp(20px, 6.4vw, 28px); }
+  .marquee span { font-size: 13px; }
+  .marquee__track { gap: 26px; }
 
   .rcard { padding: 20px 18px; }
   .rcard__name { font-size: 15.5px; }
@@ -533,6 +561,14 @@ section { padding: var(--section-pad) 0; }
 @media (max-width: 360px) {
   .stat__value { font-size: 28px; }
   .hero__title { font-size: 26px; }
+  .soulmate__hours { font-size: 38px; }
+  .section-title { font-size: 19px; }
+  .donut-center__value { font-size: 27px; }
+  .fact__num { font-size: 15.5px; }
+  .bar__value { font-size: 13px; }
+  .legend__name { font-size: 13.5px; }
+  .legend__hours { display: none; }   /* проценты остаются, часы не влезают */
+  .avatar { width: 64px; height: 64px; border-radius: 16px; font-size: 26px; }
 }
 
 .toast {

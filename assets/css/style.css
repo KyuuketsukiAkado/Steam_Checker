@@ -374,6 +374,10 @@ section { padding: var(--section-pad) 0; }
   border-radius: 3px;
 }
 .bar--colossus .bar__track { height: 10px; }
+/* имя колосса набирается плотнее — вес вместо курсива, как любим */
+.bar--colossus .bar__name { font-weight: 800; color: var(--ink); }
+/* и свечение под полосой заметнее, чтобы двойка лидеров читалась сразу */
+.bar--colossus .bar__fill { box-shadow: 0 0 26px -3px var(--bc); }
 
 /* ---------- недавно играла ---------- */
 

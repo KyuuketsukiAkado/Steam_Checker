@@ -260,9 +260,12 @@
     }
 
     top.forEach(function (g, i) {
-      var row = el("div", "bar" + (colossi && i < 2 ? " bar--colossus" : ""));
+      var isColossus = colossi && i < 2;
+      var row = el("div", "bar" + (isColossus ? " bar--colossus" : ""));
       row.style.setProperty("--bc", colors[i]);
-      row.style.setProperty("--bc2", colors[(i + 1) % colors.length]);
+      // у колоссов полоса заливается своим цветом целиком: иначе градиент
+      // уводил Доту в лёд CS2, и два акцента переставали различаться
+      row.style.setProperty("--bc2", isColossus ? colors[i] : colors[(i + 1) % colors.length]);
       row.appendChild(el("div", "bar__rank", String(i + 1).padStart(2, "0")));
 
       var body = el("div", "bar__body");

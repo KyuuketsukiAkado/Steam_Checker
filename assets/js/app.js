@@ -482,6 +482,16 @@
 
   var shareCanvas = $("#shareCanvas");
 
+  /* аватар для карточки. Файл лежит рядом, в assets/img — это тот же
+     источник, что и на странице, никаких внешних запросов. */
+  var avatarImg = null;
+  if (D.meta && D.meta.avatar) {
+    avatarImg = new Image();
+    avatarImg.onload = function () { redrawCard(); };
+    avatarImg.onerror = function () { avatarImg = null; redrawCard(); };
+    avatarImg.src = D.meta.avatar;
+  }
+
   function redrawCard() {
     var c = shareCanvas, x = c.getContext("2d");
     var W = c.width, H = c.height;
@@ -528,9 +538,44 @@
     x.textAlign = "right"; x.fillText((D.meta.generatedAt || "").slice(0, 7), W - M, 118); x.textAlign = "left";
     line(148);
 
-    // ник
+    // аватар: квадрат со скруглением, как на странице. Пока картинка
+    // не загрузилась, на его месте — плашка с первой буквой ника.
+    var AV = 128, avX = M, avY = 196, R = 34;
+    function roundRect(px, py, pw, ph, r) {
+      x.beginPath();
+      x.moveTo(px + r, py);
+      x.arcTo(px + pw, py, px + pw, py + ph, r);
+      x.arcTo(px + pw, py + ph, px, py + ph, r);
+      x.arcTo(px, py + ph, px, py, r);
+      x.arcTo(px, py, px + pw, py, r);
+      x.closePath();
+    }
+    var persona = D.meta.persona || "profile";
+    x.save();
+    roundRect(avX, avY, AV, AV, R);
+    x.clip();
+    if (avatarImg && avatarImg.complete && avatarImg.naturalWidth) {
+      // вписываем по короткой стороне, без искажения пропорций
+      var s = Math.max(AV / avatarImg.naturalWidth, AV / avatarImg.naturalHeight);
+      var dw = avatarImg.naturalWidth * s, dh = avatarImg.naturalHeight * s;
+      x.drawImage(avatarImg, avX + (AV - dw) / 2, avY + (AV - dh) / 2, dw, dh);
+    } else {
+      var ag = x.createLinearGradient(avX, avY, avX + AV, avY + AV);
+      ag.addColorStop(0, C1); ag.addColorStop(1, C4);
+      x.fillStyle = ag; x.fillRect(avX, avY, AV, AV);
+      x.fillStyle = "#0A0A0C"; x.font = "800 58px " + SANS;
+      x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillText(persona.charAt(0).toUpperCase(), avX + AV / 2, avY + AV / 2 + 4);
+      x.textAlign = "left"; x.textBaseline = "alphabetic";
+    }
+    x.restore();
+    x.strokeStyle = "rgba(255,255,255,0.12)"; x.lineWidth = 1;
+    roundRect(avX + 0.5, avY + 0.5, AV - 1, AV - 1, R); x.stroke();
+
+    // ник — правее аватара
+    var nameX = avX + AV + 34;
     x.fillStyle = INK; x.font = WD + " 76px " + SANS;
-    x.fillText(fit(D.meta.persona || "profile", W - M * 2, WD + " 76px " + SANS), M, 288);
+    x.fillText(fit(persona, W - nameX - M, WD + " 76px " + SANS), nameX, 288);
     var grad = x.createLinearGradient(M, 0, W - M, 0);
     grad.addColorStop(0, C1); grad.addColorStop(0.45, C4); grad.addColorStop(0.8, C2); grad.addColorStop(1, C5);
     x.fillStyle = grad; x.font = WD + " 76px " + SANS;
@@ -572,10 +617,10 @@
     }
 
     // топ-3
-    label("ТОП-3 ПО ЧАСАМ", 1128, C5);
+    label("ТОП-3 ПО ЧАСАМ", 1118, C5);
     var tcol = [C1, C4, C3];
     played.slice(0, 3).forEach(function (g, i) {
-      var y = 1192 + i * 54;
+      var y = 1170 + i * 50;
       x.fillStyle = tcol[i]; x.font = "700 20px " + SANS;
       x.fillText(String(i + 1).padStart(2, "0"), M, y);
       x.fillStyle = INK; x.font = "700 24px " + SANS;
@@ -584,9 +629,15 @@
       x.textAlign = "right"; x.fillText(num(g.hours) + " ч", W - M, y); x.textAlign = "left";
     });
 
-    // подпись
+    // подпись: отбита линией от топ-3, иначе налезала на третью строку
+    line(1292);
     x.fillStyle = "#5A5751"; x.font = "600 22px " + SANS;
-    x.fillText("steam wrapped · сделано вручную", M, H - 66);
+    x.fillText("steam wrapped · сделано вручную", M, H - 38);
+    if (D.meta.memberSince) {
+      x.textAlign = "right";
+      x.fillText("в Steam с " + String(D.meta.memberSince).slice(0, 4), W - M, H - 38);
+      x.textAlign = "left";
+    }
   }
   redrawCard();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawCard);

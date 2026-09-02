@@ -409,20 +409,6 @@ section { padding: var(--section-pad) 0; }
 .donut.has-hover .donut__seg { opacity: .22; }
 .donut .donut__seg.is-hover { opacity: 1; stroke-width: 28; }
 
-/* подписи прямо на кольце: жанры читаются сразу, без наведения.
-   Текст развёрнут обратно, потому что сам svg повёрнут на -90°. */
-.donut__cap {
-  font-family: var(--sans);
-  font-size: 7.5px;
-  font-weight: 800;
-  fill: #0A0A0C;
-  paint-order: stroke;
-  pointer-events: none;
-  letter-spacing: -0.01em;
-  transition: opacity .25s ease;
-}
-.donut.has-hover .donut__cap { opacity: .25; }
-.donut .donut__cap.is-hover { opacity: 1; }
 
 .donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
 .donut-center__value { font-size: 42px; font-family: var(--display); font-weight: var(--w-display); line-height: 1; letter-spacing: var(--tight); }

@@ -396,25 +396,6 @@
       c.dataset.i = i;
       svg.appendChild(c);
 
-      /* Подпись прямо на кольце — жанр виден без наведения.
-         Ставим только там, где сегмент достаточно широкий. */
-      if (arc >= 20) {
-        var mid = (off + arc / 2) / C * 360 - 90;   // svg повёрнут на -90°
-        var rad = mid * Math.PI / 180;
-        var t = document.createElementNS(ns, "text");
-        t.setAttribute("class", "donut__cap");
-        t.setAttribute("x", (100 + Math.cos(rad) * R).toFixed(1));
-        t.setAttribute("y", (100 + Math.sin(rad) * R).toFixed(1));
-        t.setAttribute("text-anchor", "middle");
-        t.setAttribute("dominant-baseline", "central");
-        t.setAttribute("transform", "rotate(90 " +
-          (100 + Math.cos(rad) * R).toFixed(1) + " " +
-          (100 + Math.sin(rad) * R).toFixed(1) + ")");
-        t.dataset.i = i;
-        t.textContent = arc >= 60 ? g.name : dec(frac * 100, 0) + "%";
-        svg.appendChild(t);
-      }
-
       off += arc;
 
       var row = el("div", "legend__row");
@@ -442,7 +423,6 @@
 
     function highlight(i, g) {
       $$(".donut__seg", svg).forEach(function (s) { s.classList.remove("is-hover"); });
-      $$(".donut__cap", svg).forEach(function (s) { s.classList.remove("is-hover"); });
       $$(".legend__row", legend).forEach(function (r) { r.classList.remove("is-hover"); });
       if (i === null) {
         svg.classList.remove("has-hover");
@@ -451,8 +431,6 @@
       }
       svg.classList.add("has-hover");
       svg.querySelector('.donut__seg[data-i="' + i + '"]').classList.add("is-hover");
-      var cap = svg.querySelector('.donut__cap[data-i="' + i + '"]');
-      if (cap) cap.classList.add("is-hover");
       var lrow = legend.querySelector('.legend__row[data-i="' + i + '"]');
       if (lrow) lrow.classList.add("is-hover");
       dv.textContent = pctStr(g.hours / sum * 100) + "%";

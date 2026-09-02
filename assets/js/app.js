@@ -684,13 +684,106 @@
     say("Карточка скачана ✓");
   });
 
-  $("#copyBtn").addEventListener("click", function () {
-    if (!navigator.clipboard || !window.ClipboardItem) { say("Браузер не умеет копировать картинки — скачай PNG"); return; }
-    shareCanvas.toBlob(function (blob) {
-      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
-        .then(function () { say("Скопировано в буфер ✓"); })
-        .catch(function () { say("Не вышло скопировать — скачай PNG"); });
+  function copyCard() {
+    // Промис: карточка в буфер обмена. Соцсети не умеют принимать файл
+    // по ссылке, поэтому единственный честный путь — буфер + Ctrl+V.
+    if (!navigator.clipboard || !window.ClipboardItem) return Promise.reject();
+    return new Promise(function (resolve, reject) {
+      shareCanvas.toBlob(function (blob) {
+        if (!blob) { reject(); return; }
+        navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+          .then(resolve, reject);
+      });
     });
+  }
+
+  $("#copyBtn").addEventListener("click", function () {
+    copyCard().then(
+      function () { say("Скопировано в буфер ✓"); },
+      function () { say("Не вышло скопировать — скачай PNG"); }
+    );
+  });
+
+  /* ---------- поделиться в соцсети ---------- */
+
+  var PAGE_URL = (document.querySelector('meta[property="og:url"]') || {}).content ||
+                 location.href.split("#")[0];
+
+  function defaultCaption() {
+    var t = D.totals || {};
+    var days = totalHours ? dec(totalHours / 24, 0) : "0";
+    var parts = [];
+    parts.push(num(totalHours) + " " + plural(totalHours, ["час", "часа", "часов"]) + " в Steam.");
+    parts.push("Это " + days + " " + plural(+days, ["день", "дня", "дней"]) + " подряд без сна.");
+    if (soulmate) {
+      parts.push(soulmate.name + " забрала " + num(soulmate.hours) + " из них.");
+    }
+    parts.push(num(t.gamesOwned || gamesOwned) + " " +
+               plural(t.gamesOwned || gamesOwned, ["игра", "игры", "игр"]) + " в библиотеке, " +
+               num(t.gamesNeverPlayed || 0) + " так и не запущены.");
+    return parts.join(" ");
+  }
+
+  var capBox = $("#captionBox");
+  if (capBox) capBox.value = defaultCaption();
+
+  function caption() {
+    return (capBox && capBox.value.trim()) || defaultCaption();
+  }
+
+  function openShare(url) {
+    // noopener обязателен: без него открытая вкладка получает доступ к нашей
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  /* сначала кладём карточку в буфер, потом открываем окно публикации —
+     иначе окно перехватывает фокус и запись в буфер отменяется */
+  function shareVia(build, name) {
+    var text = caption();
+    copyCard().then(
+      function () { say("Карточка в буфере — вставь в " + name + " через Ctrl+V"); },
+      function () { say("Карточку скопировать не вышло, скачай PNG"); }
+    ).then(function () {
+      setTimeout(function () { openShare(build(text)); }, 350);
+    });
+  }
+
+  var tg = $("#tgBtn"), li = $("#liBtn"), dc = $("#dcBtn");
+
+  if (tg) tg.addEventListener("click", function () {
+    shareVia(function (text) {
+      return "https://t.me/share/url?url=" + encodeURIComponent(PAGE_URL) +
+             "&text=" + encodeURIComponent(text);
+    }, "Telegram");
+  });
+
+  if (li) li.addEventListener("click", function () {
+    // LinkedIn берёт из ссылки только URL, текст подставляем через буфер
+    shareVia(function () {
+      return "https://www.linkedin.com/sharing/share-offsite/?url=" + encodeURIComponent(PAGE_URL);
+    }, "LinkedIn");
+  });
+
+  if (dc) dc.addEventListener("click", function () {
+    // у Discord нет окна публикации — только буфер
+    copyCard().then(
+      function () { say("Карточка в буфере — вставь в любой канал Discord"); },
+      function () { say("Не вышло скопировать — скачай PNG"); }
+    );
+  });
+
+  var capCopy = $("#capCopyBtn"), capReset = $("#capResetBtn");
+  if (capCopy) capCopy.addEventListener("click", function () {
+    var t = caption();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t + "\n" + PAGE_URL)
+        .then(function () { say("Текст скопирован ✓"); },
+              function () { say("Не вышло скопировать текст"); });
+    } else { say("Браузер не умеет копировать текст"); }
+  });
+  if (capReset) capReset.addEventListener("click", function () {
+    capBox.value = defaultCaption();
+    say("Подпись возвращена");
   });
 
   /* ---------- появление секций ---------- */

@@ -194,6 +194,25 @@
             <button class="btn btn--solid" id="dlBtn">Скачать PNG</button>
             <button class="btn" id="copyBtn">Скопировать в буфер</button>
           </div>
+
+          <p class="share__hint">
+            Соцсети не принимают картинку по ссылке — они читают её со страницы.
+            Поэтому кнопки ниже <b>кладут карточку в буфер</b> и открывают окно
+            публикации: остаётся вставить её через <b>Ctrl+V</b>.
+          </p>
+          <div class="hero__actions share__nets">
+            <button class="btn btn--net btn--tg" id="tgBtn">Telegram</button>
+            <button class="btn btn--net btn--li" id="liBtn">LinkedIn</button>
+            <button class="btn btn--net btn--dc" id="dcBtn">Discord</button>
+          </div>
+          <details class="share__caption">
+            <summary>Подпись к посту</summary>
+            <textarea id="captionBox" rows="4" spellcheck="false"></textarea>
+            <div class="share__caption-row">
+              <button class="btn btn--mini" id="capCopyBtn">Скопировать текст</button>
+              <button class="btn btn--mini" id="capResetBtn">Вернуть исходный</button>
+            </div>
+          </details>
         </div>
         <div class="share__preview">
           <canvas id="shareCanvas" width="1080" height="1350"></canvas>

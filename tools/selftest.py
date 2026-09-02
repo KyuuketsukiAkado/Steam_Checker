@@ -109,6 +109,12 @@ F.OUT_FILE = os.path.join(WORK, "data.test.js")
 F.IMG_DIR = WORK
 F.time.sleep = lambda *_: None
 
+# словарь жанров из репозитория здесь не нужен: тест проверяет, что
+# store и SteamSpy-фолбэк работают, а готовые ответы это бы скрыли
+F.GENRE_DB = os.path.join(WORK, "genres.json")
+F._GENRE_DB_CACHE = {}
+F._GENRE_DB_DIRTY = False
+
 EXTRA_TMP = os.path.join(WORK, "extra_games.json")
 with open(EXTRA_TMP, "w", encoding="utf-8") as f:
     json.dump([{"appid": 570, "name": "Dota 2™", "hours": 2848.8, "hours2w": 0,

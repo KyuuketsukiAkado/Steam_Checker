@@ -53,6 +53,11 @@ EXTRA_FILE = os.path.join(ROOT, "extra_games.json")
 OUT_FILE = os.path.join(ROOT, "assets", "js", "data.js")
 IMG_DIR = os.path.join(ROOT, "assets", "img")
 CACHE_DIR = os.path.join(ROOT, ".cache", "appdetails")
+# Словарь жанров лежит В РЕПОЗИТОРИИ и коммитится. На общих IP GitHub
+# Actions магазин Steam быстро отвечает 429, поэтому чем меньше запросов
+# нужно сделать, тем лучше: накопленное знание переиспользуется всеми
+# прогонами и всеми профилями.
+GENRE_DB = os.path.join(ROOT, "assets", "data", "genres.json")
 
 API = "https://api.steampowered.com"
 STORE = "https://store.steampowered.com/api/appdetails"
@@ -328,16 +333,60 @@ def genres_from_steamspy(appid, delay):
     return [g.strip() for g in line.split(",") if g.strip()]
 
 
+_GENRE_DB_CACHE = None
+_GENRE_DB_DIRTY = False
+
+
+def load_genre_db():
+    """Общий словарь жанров из репозитория: {"570": ["Экшен", "Стратегия"]}."""
+    global _GENRE_DB_CACHE
+    if _GENRE_DB_CACHE is None:
+        _GENRE_DB_CACHE = {}
+        if os.path.exists(GENRE_DB):
+            try:
+                with open(GENRE_DB, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    _GENRE_DB_CACHE = {str(k): v for k, v in data.items() if v}
+            except Exception:
+                log("! %s не читается, начинаю словарь заново" % os.path.relpath(GENRE_DB, ROOT))
+    return _GENRE_DB_CACHE
+
+
+def save_genre_db():
+    """Пишем словарь, только если он пополнился. Ключи по возрастанию и
+    одна игра на строку — чтобы диффы в git читались глазами."""
+    if not _GENRE_DB_DIRTY:
+        return 0
+    db = load_genre_db()
+    os.makedirs(os.path.dirname(GENRE_DB), exist_ok=True)
+    keys = sorted(db, key=lambda x: int(x) if x.isdigit() else 0)
+    rows = ",\n".join('  "%s": %s' % (k, json.dumps(db[k], ensure_ascii=False)) for k in keys)
+    with open(GENRE_DB, "w", encoding="utf-8") as f:
+        f.write("{\n" + rows + "\n}\n")
+    return len(keys)
+
+
 def get_genres(appid, delay, force=False):
-    """Жанры одной игры. Сначала кэш, потом store, потом SteamSpy.
-    Пустой результат НЕ кэшируется — следующий прогон попробует снова."""
+    """Жанры одной игры: словарь репозитория → локальный кэш → store → SteamSpy.
+    Пустой результат НЕ сохраняется — следующий прогон попробует снова."""
+    global _GENRE_DB_DIRTY
+    key = str(appid)
+
+    db = load_genre_db()
+    if key in db and not force:
+        return db[key]
+
     os.makedirs(CACHE_DIR, exist_ok=True)
     cache_path = os.path.join(CACHE_DIR, "%d.json" % appid)
-
     if os.path.exists(cache_path) and not force:
         try:
             with open(cache_path, "r", encoding="utf-8") as f:
-                return json.load(f).get("genres")
+                genres = json.load(f).get("genres")
+            if genres:
+                db[key] = genres
+                _GENRE_DB_DIRTY = True
+                return genres
         except Exception:
             pass
 
@@ -346,6 +395,8 @@ def get_genres(appid, delay, force=False):
         genres = translate_genres(genres_from_steamspy(appid, delay))
 
     if genres:
+        db[key] = genres
+        _GENRE_DB_DIRTY = True
         with open(cache_path, "w", encoding="utf-8") as f:
             json.dump({"appid": appid, "genres": genres,
                        "cached_at": datetime.now(timezone.utc).strftime("%Y-%m-%d")}, f,
@@ -594,6 +645,10 @@ def main():
     write_data_js(payload)
     log("· записан %s" % os.path.relpath(OUT_FILE, ROOT))
     log("· готово. Открывай index.html или запусти: python -m http.server 8000")
+
+    saved = save_genre_db()
+    if saved:
+        log("· словарь жанров: %d записей (%s)" % (saved, os.path.relpath(GENRE_DB, ROOT)))
 
 
 if __name__ == "__main__":

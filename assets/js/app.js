@@ -540,7 +540,7 @@
 
     // аватар: квадрат со скруглением, как на странице. Пока картинка
     // не загрузилась, на его месте — плашка с первой буквой ника.
-    var AV = 128, avX = M, avY = 196, R = 34;
+    var AV = 128, avX = M, avY = 184, R = 34;
     function roundRect(px, py, pw, ph, r) {
       x.beginPath();
       x.moveTo(px + r, py);
@@ -572,14 +572,16 @@
     x.strokeStyle = "rgba(255,255,255,0.12)"; x.lineWidth = 1;
     roundRect(avX + 0.5, avY + 0.5, AV - 1, AV - 1, R); x.stroke();
 
-    // ник — правее аватара
+    // ник — правее аватара, по центру его высоты
     var nameX = avX + AV + 34;
     x.fillStyle = INK; x.font = WD + " 76px " + SANS;
-    x.fillText(fit(persona, W - nameX - M, WD + " 76px " + SANS), nameX, 288);
-    var grad = x.createLinearGradient(M, 0, W - M, 0);
+    x.fillText(fit(persona, W - nameX - M, WD + " 76px " + SANS), nameX, 274);
+    // градиент считаем от начала самой строки, иначе коралловый край
+    // рампы остаётся левее текста и в надпись не попадает
+    var grad = x.createLinearGradient(nameX, 0, W - M, 0);
     grad.addColorStop(0, C1); grad.addColorStop(0.45, C4); grad.addColorStop(0.8, C2); grad.addColorStop(1, C5);
     x.fillStyle = grad; x.font = WD + " 76px " + SANS;
-    x.fillText("в цифрах.", M, 386);
+    x.fillText("в цифрах.", nameX, 372);
 
     // три цифры
     var cols = [
@@ -588,39 +590,39 @@
       [num(hours2w), "ч / 2 нед", C3]
     ];
     var colW = (W - M * 2) / 3;
-    line(478);
+    line(470);
     cols.forEach(function (col, i) {
       var cx = M + colW * i;
-      x.fillStyle = col[2]; x.fillRect(cx, 512, 46, 5);
+      x.fillStyle = col[2]; x.fillRect(cx, 508, 46, 5);
       x.fillStyle = col[2]; x.font = WD + " 64px " + SANS;
-      x.fillText(col[0], cx, 606);
+      x.fillText(col[0], cx, 600);
       x.fillStyle = DIM; x.font = "600 24px " + SANS;
-      x.fillText(col[1], cx, 648);
+      x.fillText(col[1], cx, 642);
     });
-    line(706);
+    line(712);
 
     // игра жизни
     if (soulmate) {
-      label("ГЛАВНАЯ ИГРА ЖИЗНИ", 772, C1);
+      label("ГЛАВНАЯ ИГРА ЖИЗНИ", 780, C1);
       x.fillStyle = INK; x.font = WD + " 46px " + SANS;
-      x.fillText(fit(soulmate.name, W - M * 2, WD + " 46px " + SANS), M, 858);
+      x.fillText(fit(soulmate.name, W - M * 2, WD + " 46px " + SANS), M, 862);
 
       var hh = num(soulmate.hours);
       var g2 = x.createLinearGradient(M, 0, W * 0.8, 0);
       g2.addColorStop(0, C1); g2.addColorStop(1, C4);
       x.fillStyle = g2; x.font = WD + " 104px " + SANS;
-      x.fillText(hh, M, 1002);
+      x.fillText(hh, M, 986);
       var w = x.measureText(hh).width;
       x.fillStyle = DIM; x.font = "600 28px " + SANS;
-      x.fillText("часов = " + dec(soulmate.hours / 24, 1) + " дней нон-стоп", M + w + 22, 1002);
-      line(1062);
+      x.fillText("часов = " + dec(soulmate.hours / 24, 1) + " дней нон-стоп", M + w + 22, 986);
+      line(1042);
     }
 
     // топ-3
-    label("ТОП-3 ПО ЧАСАМ", 1118, C5);
+    label("ТОП-3 ПО ЧАСАМ", 1082, C5);
     var tcol = [C1, C4, C3];
     played.slice(0, 3).forEach(function (g, i) {
-      var y = 1170 + i * 50;
+      var y = 1136 + i * 48;
       x.fillStyle = tcol[i]; x.font = "700 20px " + SANS;
       x.fillText(String(i + 1).padStart(2, "0"), M, y);
       x.fillStyle = INK; x.font = "700 24px " + SANS;
@@ -629,13 +631,14 @@
       x.textAlign = "right"; x.fillText(num(g.hours) + " ч", W - M, y); x.textAlign = "left";
     });
 
-    // подпись: отбита линией от топ-3, иначе налезала на третью строку
-    line(1292);
+    // подпись: своя полоса воздуха снизу. Линия отбивки далеко и от
+    // топ-3, и от самой подписи — иначе низ выглядит слипшимся.
+    line(1262);
     x.fillStyle = "#5A5751"; x.font = "600 22px " + SANS;
-    x.fillText("steam wrapped · сделано вручную", M, H - 38);
+    x.fillText("steam wrapped · сделано вручную", M, H - 55);
     if (D.meta.memberSince) {
       x.textAlign = "right";
-      x.fillText("в Steam с " + String(D.meta.memberSince).slice(0, 4), W - M, H - 38);
+      x.fillText("в Steam с " + String(D.meta.memberSince).slice(0, 4), W - M, H - 55);
       x.textAlign = "left";
     }
   }

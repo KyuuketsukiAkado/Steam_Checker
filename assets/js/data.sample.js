@@ -9,8 +9,8 @@
 
 window.STEAM_DATA = {
   meta: {
-    persona: "repro4chful",
-    profileUrl: "https://steamcommunity.com/id/repro4chful",
+    persona: "sample",
+    profileUrl: "https://steamcommunity.com/id/sample",
     avatar: null,                 // fetch_data.py положит сюда assets/img/avatar.jpg
     source: "sample",             // "sample" | "steam-api"
     generatedAt: "2026-09-01",

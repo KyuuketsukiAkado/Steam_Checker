@@ -29,7 +29,7 @@
 }
 
 /* =========================================================
-   STEAM WRAPPED · repro4chful
+   STEAM WRAPPED · mormyszka
    Тёмная тема: жирная типографика, крупные цифры,
    цветовая система из пяти акцентов (по одному на секцию).
    ========================================================= */
@@ -350,6 +350,17 @@ section { padding: var(--section-pad) 0; }
 .bar__value { font-family: var(--display); font-size: clamp(15px, 1.8vw, 21px); font-weight: var(--w-display); letter-spacing: var(--tight); white-space: nowrap; }
 .bar__value span { font-size: 11px; font-weight: 600; color: var(--ink-faint); margin-left: 5px; letter-spacing: 0; }
 
+/* два колосса почти вровень (Dota и CS2): каждому свой акцент,
+   чтобы второе место не выглядело безнадёжным */
+.bar--colossus .bar__value { color: var(--bc); }
+.bar--colossus .bar__rank {
+  opacity: 1;
+  border: 1px solid var(--bc);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.bar--colossus .bar__track { height: 10px; }
+
 /* ---------- недавно играла ---------- */
 
 .recent { display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
@@ -467,6 +478,61 @@ section { padding: var(--section-pad) 0; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   .reveal { opacity: 1; transform: none; }
+}
+
+/* =========================================================
+   МОБИЛЬНАЯ ВЁРСТКА
+   Unbounded — широкий шрифт: главная забота — крупные цифры
+   и длинные названия на узких экранах.
+   ========================================================= */
+
+/* подпись секции уезжает под заголовок, а не сжимает его */
+@media (max-width: 700px) {
+  .section-note { margin-left: 0; max-width: none; font-size: 12.5px; }
+  .section-head { gap: 12px; }
+}
+
+/* герой: ник из Unbounded не должен упираться в края */
+@media (max-width: 560px) {
+  .hero__title { font-size: clamp(28px, 9.2vw, 40px); }
+  .hero__title b { display: inline-block; }
+  .avatar { width: 76px; height: 76px; border-radius: 20px; font-size: 32px; }
+  .hero__top { gap: 16px; }
+  .stat { padding: 22px 18px; }
+  .stat__value { font-size: clamp(30px, 10vw, 44px); }
+
+  /* бары: ранг уже, шрифт компактнее — название не душится */
+  .bar { grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px; padding: 13px 4px 13px 0; }
+  .bar__rank { font-size: 10px; }
+  .bar--colossus .bar__rank { padding: 1px 3px; }
+  .bar__name { font-size: 13.5px; margin-bottom: 7px; }
+  .bar__value { font-size: 14.5px; }
+  .bar__value span { display: none; }   /* «ч» прячем, цифры и так говорят */
+
+  .soulmate__hours { font-size: clamp(40px, 13vw, 64px); }
+  .soulmate__name { overflow-wrap: anywhere; }
+  .fact { grid-template-columns: minmax(4.2ch, auto) 1fr; gap: 12px; }
+  .fact__text { font-size: 13.5px; }
+
+  .rcard { padding: 20px 18px; }
+  .rcard__name { font-size: 15.5px; }
+
+  .legend__row { grid-template-columns: 10px 1fr auto auto; gap: 10px; padding: 11px 4px 11px 0; }
+  .legend__pct { font-size: 15px; }
+  .legend__hours { min-width: 6ch; }
+
+  .fate__slot { min-height: 150px; padding: 24px 18px; }
+  .fate__name { overflow-wrap: anywhere; }
+  .fate__slot--empty { font-size: 14.5px; }
+
+  .footer__inner { flex-direction: column; gap: 10px; }
+}
+
+/* совсем узкие экраны: цифры статистики в одну колонку уже с 760,
+   но и в ней следим, чтобы Unbounded не вылезал */
+@media (max-width: 360px) {
+  .stat__value { font-size: 28px; }
+  .hero__title { font-size: 26px; }
 }
 
 .toast {

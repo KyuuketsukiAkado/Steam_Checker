@@ -3,27 +3,38 @@
 """
 fetch_data.py — тянет статистику Steam-профиля и вшивает её в страницу.
 
-Чистый Python 3.8+, никаких зависимостей.
+Чистый Python 3.8+, никаких зависимостей. (Windows: запускай просто
+`python fetch_data.py ...`.)
 
 Что делает:
   1. читает ключ из steam_key.txt (файл в .gitignore, в репо не попадает);
   2. резолвит ник (vanity URL) в SteamID64;
   3. забирает профиль, библиотеку и активность за 2 недели через Steam Web API;
-  4. добирает жанры из неофициального store-эндпоинта appdetails —
-     вежливо: с паузами, ретраями и файловым кэшем в .cache/;
-  5. качает аватар в assets/img/;
-  6. перезаписывает assets/js/data.js — страница сразу оживает.
+  4. добирает жанры из неофициального store-эндпоинта appdetails;
+     если магазин молчит (возрастной гейт, пустой ответ) — фолбэк на SteamSpy;
+     пустые результаты НЕ кэшируются, чтобы следующий прогон повторил попытку;
+  5. подмешивает игры из extra_games.json — то, что API не отдаёт
+     (например, Dota 2 из игнор-листа магазина);
+  6. отсекает служебный софт (Wallpaper Engine, ShareX, Jackbox Megapicker…)
+     и тестовые ветки игр (test server / dedicated server / beta / sdk…);
+  7. чистит жанры от меток магазина («Free to Play», «Ранний доступ»,
+     «18+», «Утилиты») и названия — от ™ и суффиксов «Complete Edition»;
+  8. качает аватар в assets/img/;
+  9. перезаписывает assets/js/data.js (компактно: одна игра на строку)
+     и считает часы по жанрам для доната.
 
 Запуск:
-    python3 fetch_data.py --user repro4chful
-    python3 fetch_data.py --steamid 76561198000000000
-    python3 fetch_data.py --user repro4chful --max-details 150 --delay 1.5
+    python fetch_data.py --user K_Ak4d0
+    python fetch_data.py --steamid 76561198000000000
+    python fetch_data.py --user K_Ak4d0 --max-details 150 --delay 1.5
 
+Первый прогон долгий (~5 минут): вежливые паузы между запросами к магазину.
 Если что-то пойдёт не так, старый data.js сохранится рядом как data.js.bak,
 а образцовые данные всегда лежат в assets/js/data.sample.js.
 """
 
 import argparse
+import html
 import json
 import os
 import random
@@ -38,12 +49,14 @@ from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 KEY_FILE = os.path.join(ROOT, "steam_key.txt")
+EXTRA_FILE = os.path.join(ROOT, "extra_games.json")
 OUT_FILE = os.path.join(ROOT, "assets", "js", "data.js")
 IMG_DIR = os.path.join(ROOT, "assets", "img")
 CACHE_DIR = os.path.join(ROOT, ".cache", "appdetails")
 
 API = "https://api.steampowered.com"
 STORE = "https://store.steampowered.com/api/appdetails"
+STEAMSPY = "https://steamspy.com/api.php"
 UA = "steam-wrapped/1.0 (personal stats page; +https://github.com/KyuuketsukiAkado)"
 
 # store отдаёт жанры на английском — переводим на человеческий
@@ -62,13 +75,91 @@ GENRE_RU = {
     "Short": "Кино", "Tutorial": "Обучение",
 }
 
-# служебный софт, который только портит статистику по жанрам
+# метки магазина, а не жанры: съедают часы и портят донат
+DROP_GENRES = {
+    "Free to Play", "Free To Play", "Ранний доступ", "Early Access",
+    "18+", "Nudity", "Sexual Content", "Утилиты", "Utilities",
+}
+
+# служебный софт, который только портит статистику
 SKIP_APPIDS = {
     250820,   # SteamVR
     323910,   # SteamVR Performance Test
     228980,   # Steamworks Common Redistributables
     365670,   # Blender (иногда числится как игра)
+    431960,   # Wallpaper Engine
 }
+
+# …и то же самое по названию, если appid вдруг другой
+SKIP_NAME_PARTS = {
+    "wallpaper engine",
+    "sharex",
+    "jackbox megapicker",
+}
+
+# тестовые и служебные ветки игр: «Dota 2 Test», «… Dedicated Server» и т.п.
+TEST_BRANCH_RE = re.compile(
+    r"test server|staging branch|\(beta\)|dedicated server|\bsdk\b|benchmark",
+    re.IGNORECASE,
+)
+
+# суффиксы переизданий, которые ничего не говорят об игре
+EDITION_RE = re.compile(
+    r"\s*[-–—:]*\s*(complete|enhanced|definitive|goty|game of the year)(\s+edition)?\s*$",
+    re.IGNORECASE,
+)
+
+
+# --------------------------------------------------------------------------
+
+
+def clean_name(name):
+    """«Some Game™ - Complete Edition» → «Some Game»."""
+    n = html.unescape(name or "").strip()
+    n = re.sub(r"[™®©]", "", n)
+    n = EDITION_RE.sub("", n)
+    n = re.sub(r"\s{2,}", " ", n).strip(" -–—:")
+    return n
+
+
+def is_junk_game(appid, name):
+    """Служебный софт и тестовые ветки — не игры, в статистику не идут."""
+    if appid in SKIP_APPIDS:
+        return True
+    low = (name or "").lower()
+    if any(part in low for part in SKIP_NAME_PARTS):
+        return True
+    if TEST_BRANCH_RE.search(low):
+        return True
+    return False
+
+
+def load_extras(path):
+    """extra_games.json: игры, которых API не отдаёт (см. README)."""
+    if not path or not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            log("! extra_games.json: ожидался список — игнорирую файл")
+            return []
+        out = []
+        for e in data:
+            if not isinstance(e, dict) or "appid" not in e:
+                continue
+            out.append({
+                "appid": int(e["appid"]),
+                "name": clean_name(e.get("name") or ("App %s" % e["appid"])),
+                "hours": round(float(e.get("hours") or 0), 1),
+                "hours2w": round(float(e.get("hours2w") or 0), 1),
+                "lastPlayed": e.get("lastPlayed") or None,
+                "genres": [GENRE_RU.get(g, g) for g in (e.get("genres") or [])][:2],
+            })
+        return out
+    except (ValueError, OSError) as e:
+        log("! extra_games.json не прочитался (%s) — продолжаю без него" % e)
+        return []
 
 
 # --------------------------------------------------------------------------
@@ -192,18 +283,20 @@ def get_recent(key, steamid):
     return (data or {}).get("response", {}).get("games", []) or []
 
 
-def get_genres(appid, delay, force=False):
-    """Жанры одной игры. Сначала кэш, потом сеть. None = не удалось."""
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    cache_path = os.path.join(CACHE_DIR, "%d.json" % appid)
+def translate_genres(genres_en):
+    """EN → RU, выкидываем метки магазина и дубли, максимум 2 жанра."""
+    seen, clean = set(), []
+    for g in genres_en:
+        ru = GENRE_RU.get(g, g)
+        if ru in DROP_GENRES or ru in seen:
+            continue
+        seen.add(ru)
+        clean.append(ru)
+    return clean[:2]
 
-    if os.path.exists(cache_path) and not force:
-        try:
-            with open(cache_path, "r", encoding="utf-8") as f:
-                return json.load(f).get("genres")
-        except Exception:
-            pass
 
+def genres_from_store(appid, delay):
+    """Жанры из карточки магазина. Пустой список = магазин молчит."""
     raw = http_get(STORE, {"appids": appid, "l": "english"}, delay=delay)
     time.sleep(delay + random.uniform(0, 0.4))      # вежливая пауза
 
@@ -216,20 +309,46 @@ def get_genres(appid, delay, force=False):
                 genres = [g.get("description") for g in d.get("genres", []) if g.get("description")]
         except ValueError:
             genres = []
+    return genres
 
-    genres = [GENRE_RU.get(g, g) for g in genres]
-    # выкидываем дубли, сохраняя порядок, оставляем максимум 2 жанра
-    seen, clean = set(), []
-    for g in genres:
-        if g not in seen:
-            seen.add(g)
-            clean.append(g)
-    clean = clean[:2]
 
-    with open(cache_path, "w", encoding="utf-8") as f:
-        json.dump({"appid": appid, "genres": clean,
-                   "cached_at": datetime.now(timezone.utc).strftime("%Y-%m-%d")}, f, ensure_ascii=False)
-    return clean
+def genres_from_steamspy(appid, delay):
+    """Фолбэк: у игр с возрастным гейтом store часто молчит — SteamSpy не церемонится."""
+    raw = http_get(STEAMSPY, {"request": "appdetails", "appid": appid}, delay=delay)
+    time.sleep(delay + random.uniform(0, 0.4))
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw.decode("utf-8"))
+        line = data.get("genre") or ""
+    except ValueError:
+        return []
+    return [g.strip() for g in line.split(",") if g.strip()]
+
+
+def get_genres(appid, delay, force=False):
+    """Жанры одной игры. Сначала кэш, потом store, потом SteamSpy.
+    Пустой результат НЕ кэшируется — следующий прогон попробует снова."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    cache_path = os.path.join(CACHE_DIR, "%d.json" % appid)
+
+    if os.path.exists(cache_path) and not force:
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                return json.load(f).get("genres")
+        except Exception:
+            pass
+
+    genres = translate_genres(genres_from_store(appid, delay))
+    if not genres:
+        genres = translate_genres(genres_from_steamspy(appid, delay))
+
+    if genres:
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump({"appid": appid, "genres": genres,
+                       "cached_at": datetime.now(timezone.utc).strftime("%Y-%m-%d")}, f,
+                      ensure_ascii=False)
+    return genres
 
 
 def download_avatar(url):
@@ -249,24 +368,38 @@ def download_avatar(url):
 # сборка data.js
 # --------------------------------------------------------------------------
 
-def build_payload(summary, game_count, owned, recent, args, avatar_path):
+def build_payload(summary, game_count, owned, recent, extras, args, avatar_path):
     recent_map = {g["appid"]: g.get("playtime_2weeks", 0) for g in recent}
 
-    games = []
+    games, skipped = [], 0
     for g in owned:
         appid = g.get("appid")
-        if appid in SKIP_APPIDS:
+        name = clean_name(g.get("name") or "App %s" % appid)
+        if is_junk_game(appid, name):
+            skipped += 1
             continue
         hours = round(g.get("playtime_forever", 0) / 60.0, 1)
         last = g.get("rtime_last_played") or 0
         games.append({
             "appid": appid,
-            "name": (g.get("name") or "App %s" % appid).strip(),
+            "name": name,
             "hours": int(hours) if hours >= 10 else hours,
             "hours2w": round(recent_map.get(appid, 0) / 60.0, 1),
             "lastPlayed": datetime.fromtimestamp(last, timezone.utc).strftime("%Y-%m-%d") if last else None,
             "genres": [],
         })
+
+    # --- extra_games.json: то, что API не отдаёт (Dota 2 и прочие игноры магазина) ---
+    if extras:
+        have = {g["appid"] for g in games}
+        for e in extras:
+            dup = [g for g in games if g["appid"] == e["appid"]]
+            if dup:
+                # игра всё-таки пришла из API: часы там главнее, жанры добираем
+                if not dup[0]["genres"]:
+                    dup[0]["genres"] = e["genres"]
+                continue
+            games.append(dict(e))
 
     games.sort(key=lambda x: (-x["hours"], x["name"]))
 
@@ -279,14 +412,29 @@ def build_payload(summary, game_count, owned, recent, args, avatar_path):
     targets = targets + sample_backlog
 
     log("· тяну жанры для %d игр (кэш: %s)" % (len(targets), CACHE_DIR))
+    if skipped:
+        log("· отсечён служебный софт и тестовые ветки: %d" % skipped)
     for i, g in enumerate(targets, 1):
-        genres = get_genres(g["appid"], args.delay, force=args.refresh_genres)
-        g["genres"] = genres or []
+        if not g["genres"]:          # extra_games.json может нести жанры с собой
+            g["genres"] = get_genres(g["appid"], args.delay, force=args.refresh_genres) or []
         if i % 10 == 0 or i == len(targets):
             log("    %d/%d" % (i, len(targets)))
 
     total_hours = round(sum(g["hours"] for g in played), 1)
     hours_2w = round(sum(g["hours2w"] for g in games), 1)
+
+    # --- часы по жанрам для доната: часы игры делятся поровну между её жанрами ---
+    gmap = {}
+    for g in played:
+        gs = g["genres"]
+        if not gs:
+            continue
+        share = g["hours"] / len(gs)
+        for name in gs:
+            gmap[name] = gmap.get(name, 0) + share
+    genre_hours = [{"name": k, "hours": (int(round(v)) if v >= 10 else round(v, 1))}
+                   for k, v in gmap.items()]
+    genre_hours.sort(key=lambda x: -x["hours"])
 
     # в страницу кладём не всё подряд: топ по часам + бэклог для рулетки
     keep = played[:args.keep_played] + backlog[:args.keep_backlog]
@@ -313,24 +461,63 @@ def build_payload(summary, game_count, owned, recent, args, avatar_path):
             "gamesNeverPlayed": len(backlog),
         },
         "soulmateAppid": soulmate,
+        "genreHours": genre_hours,
         "games": keep,
     }
 
 
+def _num(v):
+    """3.0 → 3, чтобы data.js не обрастал «.0»."""
+    if isinstance(v, float) and v.is_integer():
+        return int(v)
+    return v
+
+
+def _one_line(d, indent=4):
+    """Словарь одной строкой — компактный формат data.js."""
+    d = {k: _num(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
+         for k, v in d.items()}
+    return " " * indent + json.dumps(d, ensure_ascii=False)
+
+
 def write_data_js(payload):
-    body = json.dumps(payload, ensure_ascii=False, indent=2)
-    body = re.sub(r"\n\s+", lambda m: m.group(0), body)  # оставляем как есть, просто читаемо
+    """data.js: читаемый заголовок + компактные списки (одна игра на строку)."""
+    meta = json.dumps({k: _num(v) if isinstance(v, (int, float)) else v
+                       for k, v in payload["meta"].items()}, ensure_ascii=False)
+    totals = json.dumps({k: _num(v) for k, v in payload["totals"].items()}, ensure_ascii=False)
+
+    genre_rows = ",\n".join(_one_line(g) for g in payload["genreHours"])
+    genre_block = ("\n  \"genreHours\": [\n" + genre_rows + "\n  ],\n") if payload["genreHours"] else ""
+
+    game_rows = ",\n".join(_one_line(g) for g in payload["games"])
+
     text = (
         "/* =============================================================\n"
         "   STEAM WRAPPED — данные страницы\n"
         "   -------------------------------------------------------------\n"
-        "   ФАЙЛ СГЕНЕРИРОВАН АВТОМАТИЧЕСКИ: python3 fetch_data.py\n"
+        "   ФАЙЛ СГЕНЕРИРОВАН АВТОМАТИЧЕСКИ: python fetch_data.py\n"
         "   Правки руками перезапишутся при следующем запуске.\n"
         "   Дата сборки: %s\n"
         "   Образцовые данные лежат в data.sample.js\n"
         "   ============================================================= */\n\n"
-        "window.STEAM_DATA = %s;\n"
-    ) % (payload["meta"]["generatedAt"], body)
+        "window.STEAM_DATA = {\n"
+        "  \"meta\": %s,\n\n"
+        "  \"totals\": %s,\n\n"
+        "  \"soulmateAppid\": %s,\n"
+        "%s\n"
+        "  \"games\": [\n%s\n  ]\n"
+        "};\n"
+    ) % (
+        payload["meta"]["generatedAt"],
+        meta, totals, json.dumps(payload["soulmateAppid"]),
+        genre_block, game_rows,
+    )
+
+    # последняя контрольная проверка: содержимое должно парситься как JSON
+    try:
+        json.loads(text[text.index("{"):text.rindex("}") + 1])
+    except ValueError as e:
+        sys.exit("Собранный data.js не парсится (%s) — файл не записан" % e)
 
     if os.path.exists(OUT_FILE):
         with open(OUT_FILE, "r", encoding="utf-8") as f:
@@ -354,12 +541,13 @@ def main():
     ap.add_argument("--backlog-details", type=int, default=60, help="для скольких игр из бэклога тянуть жанры")
     ap.add_argument("--keep-played", type=int, default=60, help="сколько заигранных игр класть в data.js")
     ap.add_argument("--keep-backlog", type=int, default=80, help="сколько игр бэклога класть в data.js")
+    ap.add_argument("--extra", default=EXTRA_FILE, help="путь к extra_games.json (0 = не подмешивать)")
     ap.add_argument("--refresh-genres", action="store_true", help="игнорировать кэш жанров")
     ap.add_argument("--dry-run", action="store_true", help="показать результат, но не писать data.js")
     args = ap.parse_args()
 
     if not args.user and not args.steamid:
-        args.user = "repro4chful"
+        args.user = "K_Ak4d0"
 
     key = read_key(args.key)
     log("· ключ прочитан (…%s)" % key[-4:])
@@ -376,10 +564,14 @@ def main():
     recent = get_recent(key, steamid)
     log("· игр за 2 недели: %d" % len(recent))
 
+    extras = [] if args.extra in ("0", "") else load_extras(args.extra)
+    if extras:
+        log("· extra_games.json: +%d (%s)" % (len(extras), ", ".join(e["name"] for e in extras)))
+
     avatar_path = download_avatar(summary.get("avatarfull"))
     log("· аватар: %s" % (avatar_path or "не скачался, обойдёмся монограммой"))
 
-    payload = build_payload(summary, game_count, owned, recent, args, avatar_path)
+    payload = build_payload(summary, game_count, owned, recent, extras, args, avatar_path)
 
     t = payload["totals"]
     log("")
@@ -399,7 +591,7 @@ def main():
 
     write_data_js(payload)
     log("· записан %s" % os.path.relpath(OUT_FILE, ROOT))
-    log("· готово. Открывай index.html или запусти: python3 -m http.server 8000")
+    log("· готово. Открывай index.html или запусти: python -m http.server 8000")
 
 
 if __name__ == "__main__":

@@ -77,7 +77,9 @@
   document.title = "Steam Wrapped · " + (D.meta.persona || "profile");
   $("#brandName").textContent = D.meta.persona || "—";
   $("#year").textContent = new Date().getFullYear();
-  $("#heroEyebrow").textContent = "Личная статистика · данные от " + fmtDate(D.meta.generatedAt);
+  $("#heroEyebrow").textContent = "Личная статистика" +
+    (D.meta.memberSince ? " · в Steam с " + fmtDate(D.meta.memberSince) : "") +
+    " · данные от " + fmtDate(D.meta.generatedAt);
   $$(".hero__title")[0].innerHTML = (D.meta.persona || "profile") + "<br><b>в цифрах.</b>";
 
   var pl = $("#profileLink");
@@ -89,12 +91,14 @@
     img.src = D.meta.avatar;
     img.alt = D.meta.persona || "avatar";
     img.onload = function () { av.innerHTML = ""; av.appendChild(img); };
+    img.onerror = function () { av.textContent = (D.meta.persona || "?").charAt(0).toUpperCase(); };
   } else {
     av.textContent = (D.meta.persona || "?").charAt(0).toUpperCase();
   }
 
   $("#sourceBadge").innerHTML = "источник данных: <b>" +
-    (D.meta.source === "steam-api" ? "Steam Web API" : "образец") + "</b>";
+    (D.meta.source === "steam-api" ? "Steam Web API" :
+     D.meta.source === "manual" ? "ручная сборка" : "образец") + "</b>";
 
   /* ---------- подсказки под главными цифрами ---------- */
 
@@ -144,6 +148,7 @@
       num(neverPlayed) + " игр не запущены ни разу",
       soulmate ? soulmate.name + " — " + num(h) + " ч" : "",
       num(hours2w) + " часов за две недели",
+      D.meta.memberSince ? "в Steam с " + new Date(D.meta.memberSince).getFullYear() + " года" : "",
       "и это только Steam"
     ].filter(Boolean);
     var line = items.map(function (t) { return "<span><i>✦</i>" + t + "</span>"; }).join("");
@@ -189,10 +194,44 @@
     var ramp = ["#FF5C38", "#FF8A3D", "#FFC53D", "#B6D93F", "#22D3A5",
                 "#2BC7C7", "#4CC2FF", "#6E9CFF", "#8B5CF6", "#B45CF6"];
 
+    // два колосса почти вровень (Dota и CS2) — каждому свой акцент,
+    // чтобы второе место не выглядело безнадёжным
+    var colossi = top.length > 1 && top[1].hours / top[0].hours >= 0.8;
+
+    // хвост десятки — тёплый спектр без коралла и льда колоссов
+    var tail = ["#FFC53D", "#B6D93F", "#22D3A5", "#2BC7C7",
+                "#6E9CFF", "#8B5CF6", "#B45CF6", "#FF8AB4"];
+    var colors = top.map(function (g, i) {
+      if (colossi && i === 0) return "#FF5C38";   // коралл — лидер
+      if (colossi && i === 1) return "#4CC2FF";   // лёд — второй колосс
+      return colossi ? tail[i - 2] : ramp[i];
+    });
+
+    // подпись к секции считается на лету — зависит от расклада часов
+    var note = $("#topNote");
+    if (note) {
+      var topSum = top.reduce(function (s, g) { return s + g.hours; }, 0);
+      var rest9 = topSum - top[0].hours;
+      var leadShare = top[0].hours / topSum * 100;
+      var txt;
+      if (top[0].hours >= rest9) {
+        txt = "Одна игра забрала больше времени, чем остальные девять вместе — " +
+              "<b>" + dec(leadShare, 0) + "%</b> всей десятки. Длина полос — доля от лидера.";
+      } else if (colossi) {
+        txt = "Два колосса почти вровень: <b>" + top[0].name + "</b> и <b>" + top[1].name +
+              "</b> держат <b>" + dec((top[0].hours + top[1].hours) / topSum * 100, 0) +
+              "%</b> времени десятки. Дальше — уже про вкус, а не про привычку.";
+      } else {
+        txt = "Лидер — только <b>" + dec(leadShare, 0) + "%</b> десятки: время честно " +
+              "размазано по разным играм. Длина полос — доля от лидера.";
+      }
+      note.innerHTML = txt;
+    }
+
     top.forEach(function (g, i) {
-      var row = el("div", "bar");
-      row.style.setProperty("--bc", ramp[i % ramp.length]);
-      row.style.setProperty("--bc2", ramp[(i + 1) % ramp.length]);
+      var row = el("div", "bar" + (colossi && i < 2 ? " bar--colossus" : ""));
+      row.style.setProperty("--bc", colors[i]);
+      row.style.setProperty("--bc2", colors[(i + 1) % colors.length]);
       row.appendChild(el("div", "bar__rank", String(i + 1).padStart(2, "0")));
 
       var body = el("div", "bar__body");
@@ -259,6 +298,11 @@
   /* ---------- 04 · донат по жанрам ---------- */
 
   var genreData = (function () {
+    // если данные пришли с готовой разбивкой по жанрам (fetch_data.py) —
+    // верим ей: она посчитана по всей библиотеке, а не по выгрузке топа
+    if (D.genreHours && D.genreHours.length) {
+      return D.genreHours.slice();
+    }
     var map = {};
     played.forEach(function (g) {
       var gs = (g.genres && g.genres.length) ? g.genres : ["Без жанра"];
@@ -284,7 +328,8 @@
     if (!sum) return;
 
     var R = 78, C = 2 * Math.PI * R, off = 0;
-    var palette = ["#FF5C38", "#8B5CF6", "#22D3A5", "#FFC53D", "#4CC2FF", "#FF8AB4", "#5F5B55"];
+    var palette = ["#FF5C38", "#8B5CF6", "#22D3A5", "#FFC53D", "#4CC2FF",
+                   "#FF8AB4", "#FF8A3D", "#6E9CFF", "#5F5B55"];
 
     var ns = "http://www.w3.org/2000/svg";
     genreData.forEach(function (g, i) {
@@ -338,11 +383,26 @@
 
   (function fate() {
     var stage = $("#fateStage"), btn = $("#fateBtn");
-    $("#fateCount").textContent = backlog.length
-      ? "В бэклоге " + num(neverPlayed) + " " + plural(neverPlayed, ["игра", "игры", "игр"]) + ", ни одна не запущена"
-      : "Бэклог пуст — редкое достижение";
 
-    if (!backlog.length) { btn.disabled = true; return; }
+    if (!backlog.length) {
+      btn.disabled = true;
+      if (neverPlayed > 0) {
+        // цифра есть, списка нет: данные собирались вручную / выгрузка неполная
+        $("#fateCount").textContent = "В бэклоге " + num(neverPlayed) + " " +
+          plural(neverPlayed, ["игра", "игры", "игр"]) +
+          ", но их имена подтянутся при ближайшем обновлении данных";
+        stage.innerHTML =
+          "<div class='fate__slot fate__slot--empty'>" + num(neverPlayed) + " игр ждут<br>своего часа</div>" +
+          "<div class='fate__slot fate__slot--empty'>список появится<br>после обновления данных</div>" +
+          "<div class='fate__slot fate__slot--empty'>а пока —<br>решай сама</div>";
+      } else {
+        $("#fateCount").textContent = "Бэклог пуст — редкое достижение";
+      }
+      return;
+    }
+
+    $("#fateCount").textContent = "В бэклоге " + num(neverPlayed) + " " +
+      plural(neverPlayed, ["игра", "игры", "игр"]) + ", ни одна не запущена";
 
     function pick3() {
       var pool = backlog.slice(), out = [];

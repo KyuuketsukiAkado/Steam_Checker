@@ -224,9 +224,12 @@ def main():
         w = measure(s, 19)
         draw_text(W - M - w, 555, s, 19, d, FAINT)
 
-    # лёгкое зерно, чтобы градиенты не полосили
+    # лёгкое зерно, чтобы градиенты не полосили.
+    # маска = насколько виден сам рисунок: почти везде 255, и лишь
+    # редкие точки чуть притемняются. Раньше здесь было наоборот
+    # (10 вместо 245), из-за чего вся картинка уходила в чёрное.
     noise = Image.effect_noise((W, H), 22).convert("L")
-    noise = noise.point(lambda v: 10 if v > 140 else 0)
+    noise = noise.point(lambda v: 235 if v > 140 else 255)
     img = Image.composite(img, Image.new("RGB", (W, H), (4, 4, 6)), noise)
 
     os.makedirs(os.path.dirname(a.out), exist_ok=True)

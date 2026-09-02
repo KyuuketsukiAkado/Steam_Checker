@@ -66,6 +66,20 @@
   --section-pad: clamp(76px, 11vw, 168px);
 }
 
+/* Крупные цифры набираются моноширинными знаками: при пересчёте
+   счётчиков ширина не скачет и строка не дёргается. */
+.stat__value,
+.soulmate__hours,
+.fact__num,
+.bar__value,
+.rcard__big,
+.donut-center__value,
+.legend__pct,
+.legend__hours {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 
@@ -264,6 +278,16 @@ section { padding: var(--section-pad) 0; }
 .sec--c5 .btn--solid:hover { box-shadow: 0 16px 40px rgba(76, 194, 255, 0.36); }
 .btn[disabled] { opacity: .5; cursor: progress; transform: none; }
 
+/* Клавиатурная навигация: рамку видно только при ходьбе по Tab,
+   мышкой она не мозолит глаза. Цвет — акцент текущей секции. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.btn:focus-visible { outline-offset: 4px; }
+.share__caption textarea:focus-visible { outline-offset: 1px; }
+
 /* ---------- главные цифры ---------- */
 
 .stats {
@@ -360,6 +384,10 @@ section { padding: var(--section-pad) 0; }
   border-radius: 3px;
 }
 .bar--colossus .bar__track { height: 10px; }
+/* имя колосса набирается плотнее — вес вместо курсива, как любим */
+.bar--colossus .bar__name { font-weight: 800; color: var(--ink); }
+/* и свечение под полосой заметнее, чтобы двойка лидеров читалась сразу */
+.bar--colossus .bar__fill { box-shadow: 0 0 26px -3px var(--bc); }
 
 /* ---------- недавно играла ---------- */
 
@@ -391,6 +419,7 @@ section { padding: var(--section-pad) 0; }
 .donut.has-hover .donut__seg { opacity: .22; }
 .donut .donut__seg.is-hover { opacity: 1; stroke-width: 28; }
 
+
 .donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
 .donut-center__value { font-size: 42px; font-family: var(--display); font-weight: var(--w-display); line-height: 1; letter-spacing: var(--tight); }
 .donut-center__label { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); margin-top: 8px; }
@@ -400,7 +429,10 @@ section { padding: var(--section-pad) 0; }
   display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 14px;
   padding: 13px 8px 13px 2px; border-bottom: 1px solid var(--line-soft); transition: background .2s ease;
 }
-.legend__row:hover { background: rgba(255,255,255,0.03); }
+.legend__row:hover,
+.legend__row.is-hover { background: rgba(255,255,255,0.05); }
+/* наведение на кольцо подсвечивает и строку легенды */
+.legend__row.is-hover .legend__name { color: var(--ink); font-weight: 700; }
 .legend__dot { width: 12px; height: 12px; border-radius: 3px; }
 .legend__name { font-size: 15px; font-weight: 600; }
 .legend__pct { font-family: var(--display); font-size: 17px; font-weight: var(--w-display); letter-spacing: var(--tight); }
@@ -438,6 +470,54 @@ section { padding: var(--section-pad) 0; }
 .share__preview { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg-soft); box-shadow: 0 24px 60px rgba(0,0,0,.5); }
 .share__preview canvas { display: block; width: 100%; height: auto; }
 .share__text { color: var(--ink-dim); font-size: 15px; max-width: 46ch; }
+
+/* ---------- поделиться в соцсети ---------- */
+
+.share__hint {
+  margin: 26px 0 14px; max-width: 48ch;
+  font-size: 13px; line-height: 1.5; color: var(--ink-faint);
+}
+.share__hint b { color: var(--ink-dim); font-weight: 700; }
+
+.share__nets { margin-top: 0; }
+
+/* у каждой сети свой акцент из нашей же палитры — фирменных цветов
+   не берём, чтобы не ломать систему страницы */
+.btn--net { position: relative; padding-left: 38px; }
+.btn--net::before {
+  content: ""; position: absolute; left: 18px; top: 50%; margin-top: -5px;
+  width: 10px; height: 10px; border-radius: 3px; background: var(--nc);
+  transition: box-shadow .2s ease;
+}
+.btn--net:hover { border-color: var(--nc); color: var(--nc); }
+.btn--net:hover::before { box-shadow: 0 0 14px 0 var(--nc); }
+.btn--tg { --nc: var(--c5); }
+.btn--li { --nc: var(--c2); }
+.btn--dc { --nc: var(--c3); }
+
+.share__caption { margin-top: 22px; max-width: 52ch; }
+.share__caption summary {
+  cursor: pointer; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 8px 0; transition: color .2s ease; list-style: none;
+}
+.share__caption summary::-webkit-details-marker { display: none; }
+.share__caption summary::before { content: "＋ "; }
+.share__caption[open] summary::before { content: "− "; }
+.share__caption summary:hover { color: var(--accent); }
+.share__caption-label {
+  display: block; margin-top: 10px;
+  font-size: 12.5px; color: var(--ink-faint); line-height: 1.4;
+}
+.share__caption textarea {
+  width: 100%; margin-top: 8px; resize: vertical;
+  background: #0C0C0F; color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; padding: 14px 16px;
+  font: inherit; font-size: 14px; line-height: 1.5;
+}
+.share__caption textarea:focus { outline: none; border-color: var(--accent); }
+.share__caption-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.btn--mini { padding: 9px 16px; font-size: 12px; }
 
 /* ---------- подвал ---------- */
 
@@ -511,11 +591,31 @@ section { padding: var(--section-pad) 0; }
 
   .soulmate__hours { font-size: clamp(40px, 13vw, 64px); }
   .soulmate__name { overflow-wrap: anywhere; }
+  /* «часов» рядом с числом — с отдельной строки, иначе 2 848,8 + подпись
+     не помещаются в одну строку и Unbounded вылезает за край */
+  .soulmate__hours span:last-child { display: block; margin-top: 4px; }
   .fact { grid-template-columns: minmax(4.2ch, auto) 1fr; gap: 12px; }
   .fact__text { font-size: 13.5px; }
+  /* 63 144 раунда — самое длинное число на странице, ему нужен потолок */
+  .fact__num { font-size: 17px; }
+
+  /* центр донута: 42px были фиксированы и наезжали на кольцо */
+  .donut-center__value { font-size: clamp(30px, 9vw, 42px); }
+  .donut-center__label { font-size: 10px; letter-spacing: .1em; }
+
+  /* заголовки секций и бегущая строка */
+  .section-title { font-size: clamp(20px, 6.4vw, 28px); }
+  .marquee span { font-size: 13px; }
+  .marquee__track { gap: 26px; }
 
   .rcard { padding: 20px 18px; }
   .rcard__name { font-size: 15.5px; }
+
+  /* три кнопки сетей в ряд не помещаются: делим на равные колонки,
+     чтобы не болталась одинокая кнопка на второй строке */
+  .share__nets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .share__nets .btn--net { padding: 12px 6px 12px 26px; font-size: 12px; text-align: left; }
+  .share__nets .btn--net::before { left: 10px; width: 8px; height: 8px; margin-top: -4px; }
 
   .legend__row { grid-template-columns: 10px 1fr auto auto; gap: 10px; padding: 11px 4px 11px 0; }
   .legend__pct { font-size: 15px; }
@@ -533,6 +633,14 @@ section { padding: var(--section-pad) 0; }
 @media (max-width: 360px) {
   .stat__value { font-size: 28px; }
   .hero__title { font-size: 26px; }
+  .soulmate__hours { font-size: 38px; }
+  .section-title { font-size: 19px; }
+  .donut-center__value { font-size: 27px; }
+  .fact__num { font-size: 15.5px; }
+  .bar__value { font-size: 13px; }
+  .legend__name { font-size: 13.5px; }
+  .legend__hours { display: none; }   /* проценты остаются, часы не влезают */
+  .avatar { width: 64px; height: 64px; border-radius: 16px; font-size: 26px; }
 }
 
 .toast {

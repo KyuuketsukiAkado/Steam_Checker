@@ -171,6 +171,25 @@
 
   if (soulmate) {
     var h = soulmate.hours;
+
+    /* единица пересчёта подбирается под саму игру: у Доты матчи,
+       у шутеров раунды, у фермы игровые дни, дальше — по жанру */
+    var unit = (function (g) {
+      var name = g.name.toLowerCase();
+      var genres = (g.genres || []).join(" ");
+      if (/dota|league of legends|smite|deadlock|heroes of the storm/.test(name))
+        return { min: 38, word: "матчей", note: "по 38 минут — столько длится средняя катка" };
+      if (/counter-strike|valorant|rainbow six|call of duty/.test(name))
+        return { min: 2.5, word: "раундов", note: "если считать по 2,5 минуты на каждый" };
+      if (/stardew|animal crossing|sims/.test(name))
+        return { min: 20, word: "игровых дней", note: "по 20 минут реального времени каждый" };
+      if (/Гонки/.test(genres))
+        return { min: 6, word: "заездов", note: "по шесть минут за круг почёта" };
+      if (/Стратегия/.test(genres))
+        return { min: 45, word: "партий", note: "по 45 минут — от первого хода до победы" };
+      return { min: 120, word: "вечеров", note: "по два часа, от «на часик» до «ещё один»" };
+    })(soulmate);
+
     $("#smName").textContent = soulmate.name;
     $("#smShare").textContent =
       "Это " + dec(h / totalHours * 100, 0) + "% всего времени в Steam. " +
@@ -183,7 +202,7 @@
       [num(h / 11.4),         "<b>трилогий «Властелин колец»</b> в режиссёрской версии"],
       [dec(h / 600, 1),       "<b>иностранных языков</b> до уверенного B2 (600 ч каждый)"],
       [num(h * 5),            "<b>километров</b> пешком, если бы шла вместо игры — это дальше, чем от Минска до Токио"],
-      [num(h * 60 / 2.5),     "<b>раундов</b>, если считать по 2,5 минуты на каждый"],
+      [num(h * 60 / unit.min), "<b>" + unit.word + "</b> " + unit.note],
       [dec(h / 3.5, 0),       "<b>марафонов</b> можно было бы пробежать (по 3,5 ч)"]
     ];
 
@@ -241,9 +260,12 @@
     }
 
     top.forEach(function (g, i) {
-      var row = el("div", "bar" + (colossi && i < 2 ? " bar--colossus" : ""));
+      var isColossus = colossi && i < 2;
+      var row = el("div", "bar" + (isColossus ? " bar--colossus" : ""));
       row.style.setProperty("--bc", colors[i]);
-      row.style.setProperty("--bc2", colors[(i + 1) % colors.length]);
+      // у колоссов полоса заливается своим цветом целиком: иначе градиент
+      // уводил Доту в лёд CS2, и два акцента переставали различаться
+      row.style.setProperty("--bc2", isColossus ? colors[i] : colors[(i + 1) % colors.length]);
       row.appendChild(el("div", "bar__rank", String(i + 1).padStart(2, "0")));
 
       var body = el("div", "bar__body");
@@ -343,20 +365,38 @@
     var palette = ["#FF5C38", "#8B5CF6", "#22D3A5", "#FFC53D", "#4CC2FF",
                    "#FF8AB4", "#FF8A3D", "#6E9CFF", "#5F5B55"];
 
+    /* Минимальная дуга. Симулятор и MMO — это 0,4% и 0,1%: их доля
+       короче зазора между сегментами, дуга получалась отрицательной
+       и жанр просто не рисовался. Даём каждому видимый минимум и
+       забираем добавку у самых крупных, чтобы сумма осталась целой. */
+    var GAP = 2, MINARC = 7;
+    var arcs = genreData.map(function (g) { return g.hours / sum * C; });
+    var debt = 0;
+    arcs = arcs.map(function (a) {
+      if (a < MINARC) { debt += MINARC - a; return MINARC; }
+      return a;
+    });
+    if (debt > 0) {
+      var big = arcs.reduce(function (s, a) { return s + (a > MINARC ? a : 0); }, 0);
+      arcs = arcs.map(function (a) { return a > MINARC ? a - debt * (a / big) : a; });
+    }
+
     var ns = "http://www.w3.org/2000/svg";
     genreData.forEach(function (g, i) {
       var frac = g.hours / sum;
+      var arc = arcs[i];
       var c = document.createElementNS(ns, "circle");
       c.setAttribute("class", "donut__seg");
       c.setAttribute("cx", 100); c.setAttribute("cy", 100); c.setAttribute("r", R);
       c.setAttribute("fill", "none");
       c.setAttribute("stroke", palette[i % palette.length]);
       c.setAttribute("stroke-width", 22);
-      c.setAttribute("stroke-dasharray", (frac * C - 2).toFixed(2) + " " + C);
+      c.setAttribute("stroke-dasharray", Math.max(arc - GAP, 1.5).toFixed(2) + " " + C);
       c.setAttribute("stroke-dashoffset", (-off).toFixed(2));
       c.dataset.i = i;
       svg.appendChild(c);
-      off += frac * C;
+
+      off += arc;
 
       var row = el("div", "legend__row");
       row.dataset.i = i;
@@ -383,6 +423,7 @@
 
     function highlight(i, g) {
       $$(".donut__seg", svg).forEach(function (s) { s.classList.remove("is-hover"); });
+      $$(".legend__row", legend).forEach(function (r) { r.classList.remove("is-hover"); });
       if (i === null) {
         svg.classList.remove("has-hover");
         dv.textContent = defaultValue; dl.textContent = defaultLabel;
@@ -390,6 +431,8 @@
       }
       svg.classList.add("has-hover");
       svg.querySelector('.donut__seg[data-i="' + i + '"]').classList.add("is-hover");
+      var lrow = legend.querySelector('.legend__row[data-i="' + i + '"]');
+      if (lrow) lrow.classList.add("is-hover");
       dv.textContent = pctStr(g.hours / sum * 100) + "%";
       dl.textContent = g.name;
     }
@@ -460,6 +503,16 @@
 
   var shareCanvas = $("#shareCanvas");
 
+  /* аватар для карточки. Файл лежит рядом, в assets/img — это тот же
+     источник, что и на странице, никаких внешних запросов. */
+  var avatarImg = null;
+  if (D.meta && D.meta.avatar) {
+    avatarImg = new Image();
+    avatarImg.onload = function () { redrawCard(); };
+    avatarImg.onerror = function () { avatarImg = null; redrawCard(); };
+    avatarImg.src = D.meta.avatar;
+  }
+
   function redrawCard() {
     var c = shareCanvas, x = c.getContext("2d");
     var W = c.width, H = c.height;
@@ -506,13 +559,50 @@
     x.textAlign = "right"; x.fillText((D.meta.generatedAt || "").slice(0, 7), W - M, 118); x.textAlign = "left";
     line(148);
 
-    // ник
+    // аватар: квадрат со скруглением, как на странице. Пока картинка
+    // не загрузилась, на его месте — плашка с первой буквой ника.
+    var AV = 128, avX = M, avY = 184, R = 34;
+    function roundRect(px, py, pw, ph, r) {
+      x.beginPath();
+      x.moveTo(px + r, py);
+      x.arcTo(px + pw, py, px + pw, py + ph, r);
+      x.arcTo(px + pw, py + ph, px, py + ph, r);
+      x.arcTo(px, py + ph, px, py, r);
+      x.arcTo(px, py, px + pw, py, r);
+      x.closePath();
+    }
+    var persona = D.meta.persona || "profile";
+    x.save();
+    roundRect(avX, avY, AV, AV, R);
+    x.clip();
+    if (avatarImg && avatarImg.complete && avatarImg.naturalWidth) {
+      // вписываем по короткой стороне, без искажения пропорций
+      var s = Math.max(AV / avatarImg.naturalWidth, AV / avatarImg.naturalHeight);
+      var dw = avatarImg.naturalWidth * s, dh = avatarImg.naturalHeight * s;
+      x.drawImage(avatarImg, avX + (AV - dw) / 2, avY + (AV - dh) / 2, dw, dh);
+    } else {
+      var ag = x.createLinearGradient(avX, avY, avX + AV, avY + AV);
+      ag.addColorStop(0, C1); ag.addColorStop(1, C4);
+      x.fillStyle = ag; x.fillRect(avX, avY, AV, AV);
+      x.fillStyle = "#0A0A0C"; x.font = "800 58px " + SANS;
+      x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillText(persona.charAt(0).toUpperCase(), avX + AV / 2, avY + AV / 2 + 4);
+      x.textAlign = "left"; x.textBaseline = "alphabetic";
+    }
+    x.restore();
+    x.strokeStyle = "rgba(255,255,255,0.12)"; x.lineWidth = 1;
+    roundRect(avX + 0.5, avY + 0.5, AV - 1, AV - 1, R); x.stroke();
+
+    // ник — правее аватара, по центру его высоты
+    var nameX = avX + AV + 34;
     x.fillStyle = INK; x.font = WD + " 76px " + SANS;
-    x.fillText(fit(D.meta.persona || "profile", W - M * 2, WD + " 76px " + SANS), M, 288);
-    var grad = x.createLinearGradient(M, 0, W - M, 0);
+    x.fillText(fit(persona, W - nameX - M, WD + " 76px " + SANS), nameX, 274);
+    // градиент считаем от начала самой строки, иначе коралловый край
+    // рампы остаётся левее текста и в надпись не попадает
+    var grad = x.createLinearGradient(nameX, 0, W - M, 0);
     grad.addColorStop(0, C1); grad.addColorStop(0.45, C4); grad.addColorStop(0.8, C2); grad.addColorStop(1, C5);
     x.fillStyle = grad; x.font = WD + " 76px " + SANS;
-    x.fillText("в цифрах.", M, 386);
+    x.fillText("в цифрах.", nameX, 372);
 
     // три цифры
     var cols = [
@@ -521,39 +611,39 @@
       [num(hours2w), "ч / 2 нед", C3]
     ];
     var colW = (W - M * 2) / 3;
-    line(478);
+    line(470);
     cols.forEach(function (col, i) {
       var cx = M + colW * i;
-      x.fillStyle = col[2]; x.fillRect(cx, 512, 46, 5);
+      x.fillStyle = col[2]; x.fillRect(cx, 508, 46, 5);
       x.fillStyle = col[2]; x.font = WD + " 64px " + SANS;
-      x.fillText(col[0], cx, 606);
+      x.fillText(col[0], cx, 600);
       x.fillStyle = DIM; x.font = "600 24px " + SANS;
-      x.fillText(col[1], cx, 648);
+      x.fillText(col[1], cx, 642);
     });
-    line(706);
+    line(712);
 
     // игра жизни
     if (soulmate) {
-      label("ГЛАВНАЯ ИГРА ЖИЗНИ", 772, C1);
+      label("ГЛАВНАЯ ИГРА ЖИЗНИ", 780, C1);
       x.fillStyle = INK; x.font = WD + " 46px " + SANS;
-      x.fillText(fit(soulmate.name, W - M * 2, WD + " 46px " + SANS), M, 858);
+      x.fillText(fit(soulmate.name, W - M * 2, WD + " 46px " + SANS), M, 862);
 
       var hh = num(soulmate.hours);
       var g2 = x.createLinearGradient(M, 0, W * 0.8, 0);
       g2.addColorStop(0, C1); g2.addColorStop(1, C4);
       x.fillStyle = g2; x.font = WD + " 104px " + SANS;
-      x.fillText(hh, M, 1002);
+      x.fillText(hh, M, 986);
       var w = x.measureText(hh).width;
       x.fillStyle = DIM; x.font = "600 28px " + SANS;
-      x.fillText("часов = " + dec(soulmate.hours / 24, 1) + " дней нон-стоп", M + w + 22, 1002);
-      line(1062);
+      x.fillText("часов = " + dec(soulmate.hours / 24, 1) + " дней нон-стоп", M + w + 22, 986);
+      line(1042);
     }
 
     // топ-3
-    label("ТОП-3 ПО ЧАСАМ", 1128, C5);
+    label("ТОП-3 ПО ЧАСАМ", 1082, C5);
     var tcol = [C1, C4, C3];
     played.slice(0, 3).forEach(function (g, i) {
-      var y = 1192 + i * 54;
+      var y = 1136 + i * 48;
       x.fillStyle = tcol[i]; x.font = "700 20px " + SANS;
       x.fillText(String(i + 1).padStart(2, "0"), M, y);
       x.fillStyle = INK; x.font = "700 24px " + SANS;
@@ -562,9 +652,16 @@
       x.textAlign = "right"; x.fillText(num(g.hours) + " ч", W - M, y); x.textAlign = "left";
     });
 
-    // подпись
+    // подпись: своя полоса воздуха снизу. Линия отбивки далеко и от
+    // топ-3, и от самой подписи — иначе низ выглядит слипшимся.
+    line(1262);
     x.fillStyle = "#5A5751"; x.font = "600 22px " + SANS;
-    x.fillText("steam wrapped · сделано вручную", M, H - 66);
+    x.fillText("steam wrapped · сделано вручную", M, H - 55);
+    if (D.meta.memberSince) {
+      x.textAlign = "right";
+      x.fillText("в Steam с " + String(D.meta.memberSince).slice(0, 4), W - M, H - 55);
+      x.textAlign = "left";
+    }
   }
   redrawCard();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawCard);
@@ -587,13 +684,106 @@
     say("Карточка скачана ✓");
   });
 
-  $("#copyBtn").addEventListener("click", function () {
-    if (!navigator.clipboard || !window.ClipboardItem) { say("Браузер не умеет копировать картинки — скачай PNG"); return; }
-    shareCanvas.toBlob(function (blob) {
-      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
-        .then(function () { say("Скопировано в буфер ✓"); })
-        .catch(function () { say("Не вышло скопировать — скачай PNG"); });
+  function copyCard() {
+    // Промис: карточка в буфер обмена. Соцсети не умеют принимать файл
+    // по ссылке, поэтому единственный честный путь — буфер + Ctrl+V.
+    if (!navigator.clipboard || !window.ClipboardItem) return Promise.reject();
+    return new Promise(function (resolve, reject) {
+      shareCanvas.toBlob(function (blob) {
+        if (!blob) { reject(); return; }
+        navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+          .then(resolve, reject);
+      });
     });
+  }
+
+  $("#copyBtn").addEventListener("click", function () {
+    copyCard().then(
+      function () { say("Скопировано в буфер ✓"); },
+      function () { say("Не вышло скопировать — скачай PNG"); }
+    );
+  });
+
+  /* ---------- поделиться в соцсети ---------- */
+
+  var PAGE_URL = (document.querySelector('meta[property="og:url"]') || {}).content ||
+                 location.href.split("#")[0];
+
+  function defaultCaption() {
+    var t = D.totals || {};
+    var days = totalHours ? dec(totalHours / 24, 0) : "0";
+    var parts = [];
+    parts.push(num(totalHours) + " " + plural(totalHours, ["час", "часа", "часов"]) + " в Steam.");
+    parts.push("Это " + days + " " + plural(+days, ["день", "дня", "дней"]) + " подряд без сна.");
+    if (soulmate) {
+      parts.push(soulmate.name + " забрала " + num(soulmate.hours) + " из них.");
+    }
+    parts.push(num(t.gamesOwned || gamesOwned) + " " +
+               plural(t.gamesOwned || gamesOwned, ["игра", "игры", "игр"]) + " в библиотеке, " +
+               num(t.gamesNeverPlayed || 0) + " так и не запущены.");
+    return parts.join(" ");
+  }
+
+  var capBox = $("#captionBox");
+  if (capBox) capBox.value = defaultCaption();
+
+  function caption() {
+    return (capBox && capBox.value.trim()) || defaultCaption();
+  }
+
+  function openShare(url) {
+    // noopener обязателен: без него открытая вкладка получает доступ к нашей
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  /* сначала кладём карточку в буфер, потом открываем окно публикации —
+     иначе окно перехватывает фокус и запись в буфер отменяется */
+  function shareVia(build, name) {
+    var text = caption();
+    copyCard().then(
+      function () { say("Карточка в буфере — вставь в " + name + " через Ctrl+V"); },
+      function () { say("Карточку скопировать не вышло, скачай PNG"); }
+    ).then(function () {
+      setTimeout(function () { openShare(build(text)); }, 350);
+    });
+  }
+
+  var tg = $("#tgBtn"), li = $("#liBtn"), dc = $("#dcBtn");
+
+  if (tg) tg.addEventListener("click", function () {
+    shareVia(function (text) {
+      return "https://t.me/share/url?url=" + encodeURIComponent(PAGE_URL) +
+             "&text=" + encodeURIComponent(text);
+    }, "Telegram");
+  });
+
+  if (li) li.addEventListener("click", function () {
+    // LinkedIn берёт из ссылки только URL, текст подставляем через буфер
+    shareVia(function () {
+      return "https://www.linkedin.com/sharing/share-offsite/?url=" + encodeURIComponent(PAGE_URL);
+    }, "LinkedIn");
+  });
+
+  if (dc) dc.addEventListener("click", function () {
+    // у Discord нет окна публикации — только буфер
+    copyCard().then(
+      function () { say("Карточка в буфере — вставь в любой канал Discord"); },
+      function () { say("Не вышло скопировать — скачай PNG"); }
+    );
+  });
+
+  var capCopy = $("#capCopyBtn"), capReset = $("#capResetBtn");
+  if (capCopy) capCopy.addEventListener("click", function () {
+    var t = caption();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t + "\n" + PAGE_URL)
+        .then(function () { say("Текст скопирован ✓"); },
+              function () { say("Не вышло скопировать текст"); });
+    } else { say("Браузер не умеет копировать текст"); }
+  });
+  if (capReset) capReset.addEventListener("click", function () {
+    capBox.value = defaultCaption();
+    say("Подпись возвращена");
   });
 
   /* ---------- появление секций ---------- */

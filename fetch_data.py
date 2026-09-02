@@ -173,6 +173,16 @@ def load_extras(path):
 # сеть
 # --------------------------------------------------------------------------
 
+def safe_url(url):
+    """Адрес без query — в query лежит ключ API, в логи он попасть не должен.
+
+    Логи GitHub Actions публичны, поэтому режем жёстко: сначала отбрасываем
+    всё после «?», затем на всякий случай маскируем всё, что выглядит как
+    ключ (32 hex-символа)."""
+    base = str(url).split("?")[0]
+    return re.sub(r"[0-9A-Fa-f]{32}", "***", base)
+
+
 def http_get(url, params=None, retries=4, timeout=25, delay=1.0, binary=False):
     """GET с ретраями и экспоненциальной паузой. Возвращает bytes или None."""
     if params:
@@ -196,7 +206,7 @@ def http_get(url, params=None, retries=4, timeout=25, delay=1.0, binary=False):
                 continue
             if e.code in (403, 404):
                 return None
-            log("    ! HTTP %s на %s" % (e.code, url.split("?")[0]))
+            log("    ! HTTP %s на %s" % (e.code, safe_url(url)))
             return None
         except Exception as e:                      # таймауты, DNS, TLS
             wait = delay * (2 ** attempt) + random.uniform(0, 0.6)
@@ -270,6 +280,10 @@ def get_summary(key, steamid):
     return players[0] if players else {}
 
 
+class PrivateProfile(Exception):
+    """Профиль закрыт или не существует — не поломка, а настройка Steam."""
+
+
 def get_owned(key, steamid):
     data = api_json("/IPlayerService/GetOwnedGames/v1/", key,
                     steamid=steamid, include_appinfo=1,
@@ -277,10 +291,11 @@ def get_owned(key, steamid):
     resp = (data or {}).get("response", {})
     games = resp.get("games")
     if games is None:
-        sys.exit(
-            "API вернул пустую библиотеку.\n"
-            "Скорее всего, приватность профиля закрыта: Steam → Профиль →\n"
-            "Настройки приватности → «Игровые данные» = Открытый доступ."
+        raise PrivateProfile(
+            "Steam не отдал библиотеку профиля %s.\n"
+            "Обычно это закрытая приватность. Нужно: Steam → Профиль →\n"
+            "Настройки приватности → «Игровые данные» = Открытый доступ,\n"
+            "затем подождать пару минут и повторить." % steamid
         )
     return resp.get("game_count", len(games)), games
 
@@ -404,17 +419,17 @@ def get_genres(appid, delay, force=False):
     return genres
 
 
-def download_avatar(url):
+def download_avatar(url, filename="avatar.jpg"):
     if not url:
         return None
     os.makedirs(IMG_DIR, exist_ok=True)
     raw = http_get(url, binary=True)
     if not raw:
         return None
-    path = os.path.join(IMG_DIR, "avatar.jpg")
+    path = os.path.join(IMG_DIR, filename)
     with open(path, "wb") as f:
         f.write(raw)
-    return "assets/img/avatar.jpg"
+    return "assets/img/" + filename
 
 
 # --------------------------------------------------------------------------
@@ -533,8 +548,9 @@ def _one_line(d, indent=4):
     return " " * indent + json.dumps(d, ensure_ascii=False)
 
 
-def write_data_js(payload):
+def write_data_js(payload, out_file=None):
     """data.js: читаемый заголовок + компактные списки (одна игра на строку)."""
+    out_file = out_file or OUT_FILE
     meta = json.dumps({k: _num(v) if isinstance(v, (int, float)) else v
                        for k, v in payload["meta"].items()}, ensure_ascii=False)
     totals = json.dumps({k: _num(v) for k, v in payload["totals"].items()}, ensure_ascii=False)
@@ -572,14 +588,77 @@ def write_data_js(payload):
     except ValueError as e:
         sys.exit("Собранный data.js не парсится (%s) — файл не записан" % e)
 
-    if os.path.exists(OUT_FILE):
-        with open(OUT_FILE, "r", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    if os.path.exists(out_file):
+        with open(out_file, "r", encoding="utf-8") as f:
             old = f.read()
-        with open(OUT_FILE + ".bak", "w", encoding="utf-8") as f:
+        with open(out_file + ".bak", "w", encoding="utf-8") as f:
             f.write(old)
 
-    with open(OUT_FILE, "w", encoding="utf-8") as f:
+    with open(out_file, "w", encoding="utf-8") as f:
         f.write(text)
+
+
+# --------------------------------------------------------------------------
+
+def write_profile_page(steamid, payload, data_rel):
+    """Страница u/<steamid>/index.html из общего шаблона index.html.
+
+    Отдельного шаблона намеренно нет: правки вёрстки главной страницы
+    должны сами доезжать до страниц друзей. Меняем ровно три вещи —
+    пути к ресурсам (на два уровня глубже), подключаемый data.js
+    и og-теги под конкретный профиль.
+    """
+    def plural(n, forms):
+        n = abs(int(n or 0)) % 100
+        n1 = n % 10
+        if 10 < n < 20:
+            return forms[2]
+        if 1 < n1 < 5:
+            return forms[1]
+        if n1 == 1:
+            return forms[0]
+        return forms[2]
+
+    with open(os.path.join(ROOT, "index.html"), "r", encoding="utf-8") as f:
+        page = f.read()
+
+    meta = payload["meta"]
+    totals = payload["totals"]
+    persona = meta.get("persona") or steamid
+    site = "https://kyuuketsukiakado.github.io/steam-wrapped"
+    page_url = "%s/u/%s/" % (site, steamid)
+
+    # ../../ — страница лежит на два уровня глубже корня
+    page = re.sub(r'((?:href|src)=")(assets/)', r"\1../../\2", page)
+    page = page.replace('src="../../assets/js/data.js"', 'src="%s"' % data_rel)
+
+    games_n = totals.get("gamesOwned") or 0
+    hours_n = totals.get("hoursTotal") or 0
+    title = "Steam Wrapped · %s" % persona
+    desc = "Статистика Steam-профиля %s: %s %s, %s %s." % (
+        persona, games_n, plural(games_n, ["игра", "игры", "игр"]),
+        hours_n, plural(hours_n, ["час", "часа", "часов"]))
+
+    page = re.sub(r"<title>.*?</title>", "<title>%s</title>" % html.escape(title), page, flags=re.S)
+    subs = {
+        r'(<meta name="description" content=")[^"]*(")': desc,
+        r'(<meta property="og:title" content=")[^"]*(")': title,
+        r'(<meta property="og:description" content=")[^"]*(")': desc,
+        r'(<meta property="og:url" content=")[^"]*(")': page_url,
+        r'(<meta name="twitter:title" content=")[^"]*(")': title,
+        r'(<meta name="twitter:description" content=")[^"]*(")': desc,
+        r'(<meta property="og:image:alt" content=")[^"]*(")': "%s в цифрах" % persona,
+    }
+    for pattern, value in subs.items():
+        page = re.sub(pattern, lambda m, v=value: m.group(1) + html.escape(v) + m.group(2), page)
+
+    out_dir = os.path.join(ROOT, "u", steamid)
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "index.html")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(page)
+    return out_path, page_url
 
 
 # --------------------------------------------------------------------------
@@ -597,13 +676,16 @@ def main():
     ap.add_argument("--extra", default=EXTRA_FILE, help="путь к extra_games.json (0 = не подмешивать)")
     ap.add_argument("--refresh-genres", action="store_true", help="игнорировать кэш жанров")
     ap.add_argument("--dry-run", action="store_true", help="показать результат, но не писать data.js")
+    ap.add_argument("--profile", action="store_true",
+                    help="режим друга: писать в assets/data/<steamid>.js и собрать u/<steamid>/index.html")
     args = ap.parse_args()
 
     if not args.user and not args.steamid:
         args.user = "K_Ak4d0"
 
     key = read_key(args.key)
-    log("· ключ прочитан (…%s)" % key[-4:])
+    # ни одного символа ключа в лог: прогоны в Actions видны всем
+    log("· ключ прочитан (%d символов)" % len(key))
 
     steamid = args.steamid or resolve_steamid(key, args.user)
     log("· SteamID64: %s" % steamid)
@@ -621,7 +703,11 @@ def main():
     if extras:
         log("· extra_games.json: +%d (%s)" % (len(extras), ", ".join(e["name"] for e in extras)))
 
-    avatar_path = download_avatar(summary.get("avatarfull"))
+    # у друга свой файл аватара, чтобы не затирать хозяйский
+    avatar_name = ("avatar-%s.jpg" % steamid) if args.profile else "avatar.jpg"
+    avatar_path = download_avatar(summary.get("avatarfull"), avatar_name)
+    if args.profile and avatar_path:
+        avatar_path = "../../" + avatar_path
     log("· аватар: %s" % (avatar_path or "не скачался, обойдёмся монограммой"))
 
     payload = build_payload(summary, game_count, owned, recent, extras, args, avatar_path)
@@ -639,12 +725,20 @@ def main():
     log("")
 
     if args.dry_run:
-        log("· dry-run: data.js не тронут")
+        log("· dry-run: ничего не записано")
         return
 
-    write_data_js(payload)
-    log("· записан %s" % os.path.relpath(OUT_FILE, ROOT))
-    log("· готово. Открывай index.html или запусти: python -m http.server 8000")
+    if args.profile:
+        out_file = os.path.join(ROOT, "assets", "data", "%s.js" % steamid)
+        write_data_js(payload, out_file)
+        log("· записан %s" % os.path.relpath(out_file, ROOT))
+        page, url = write_profile_page(steamid, payload, "../../assets/data/%s.js" % steamid)
+        log("· страница: %s" % os.path.relpath(page, ROOT))
+        log("· ссылка:   %s" % url)
+    else:
+        write_data_js(payload)
+        log("· записан %s" % os.path.relpath(OUT_FILE, ROOT))
+        log("· готово. Открывай index.html или запусти: python -m http.server 8000")
 
     saved = save_genre_db()
     if saved:
@@ -654,5 +748,12 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except PrivateProfile as e:
+        # отдельный код возврата: workflow отличит закрытый профиль
+        # от настоящей поломки и ответит человеку понятным текстом
+        log("")
+        log("✗ ПРОФИЛЬ ЗАКРЫТ")
+        log(str(e))
+        sys.exit(3)
     except KeyboardInterrupt:
         log("\n· прервано")

@@ -171,6 +171,25 @@
 
   if (soulmate) {
     var h = soulmate.hours;
+
+    /* единица пересчёта подбирается под саму игру: у Доты матчи,
+       у шутеров раунды, у фермы игровые дни, дальше — по жанру */
+    var unit = (function (g) {
+      var name = g.name.toLowerCase();
+      var genres = (g.genres || []).join(" ");
+      if (/dota|league of legends|smite|deadlock|heroes of the storm/.test(name))
+        return { min: 38, word: "матчей", note: "по 38 минут — столько длится средняя катка" };
+      if (/counter-strike|valorant|rainbow six|call of duty/.test(name))
+        return { min: 2.5, word: "раундов", note: "если считать по 2,5 минуты на каждый" };
+      if (/stardew|animal crossing|sims/.test(name))
+        return { min: 20, word: "игровых дней", note: "по 20 минут реального времени каждый" };
+      if (/Гонки/.test(genres))
+        return { min: 6, word: "заездов", note: "по шесть минут за круг почёта" };
+      if (/Стратегия/.test(genres))
+        return { min: 45, word: "партий", note: "по 45 минут — от первого хода до победы" };
+      return { min: 120, word: "вечеров", note: "по два часа, от «на часик» до «ещё один»" };
+    })(soulmate);
+
     $("#smName").textContent = soulmate.name;
     $("#smShare").textContent =
       "Это " + dec(h / totalHours * 100, 0) + "% всего времени в Steam. " +
@@ -183,7 +202,7 @@
       [num(h / 11.4),         "<b>трилогий «Властелин колец»</b> в режиссёрской версии"],
       [dec(h / 600, 1),       "<b>иностранных языков</b> до уверенного B2 (600 ч каждый)"],
       [num(h * 5),            "<b>километров</b> пешком, если бы шла вместо игры — это дальше, чем от Минска до Токио"],
-      [num(h * 60 / 2.5),     "<b>раундов</b>, если считать по 2,5 минуты на каждый"],
+      [num(h * 60 / unit.min), "<b>" + unit.word + "</b> " + unit.note],
       [dec(h / 3.5, 0),       "<b>марафонов</b> можно было бы пробежать (по 3,5 ч)"]
     ];
 

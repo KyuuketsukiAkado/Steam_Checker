@@ -257,6 +257,61 @@ section { padding: var(--section-pad) 0; }
 
 .hero__actions { display: flex; gap: 12px; margin-top: 34px; flex-wrap: wrap; }
 
+/* ---------- Явный запрос публичного Steam-профиля ---------- */
+
+.profile-form {
+  max-width: 760px;
+  margin-top: 28px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--c1);
+  background: rgba(16, 16, 20, 0.62);
+}
+.profile-form__label {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.profile-form__row { display: flex; gap: 10px; align-items: stretch; }
+.profile-form__input {
+  min-width: 0;
+  flex: 1 1 360px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #0A0A0C;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  padding: 12px 17px;
+}
+.profile-form__input::placeholder { color: var(--ink-faint); opacity: 1; }
+.profile-form__input:focus { border-color: var(--c1); outline: none; }
+.profile-form__status {
+  min-height: 1.5em;
+  margin: 9px 2px 0;
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.profile-form__status.is-error { color: #FF9A84; }
+.profile-form__status.is-loading { color: var(--c4); }
+.profile-form__status.is-ok { color: var(--c3); }
+.profile-form__reset {
+  display: inline-block;
+  margin: 5px 2px 0;
+  color: var(--ink-dim);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 620px) {
+  .profile-form__row { flex-direction: column; }
+  .profile-form__row .btn { width: 100%; }
+}
+
 /* ---------- кнопки ---------- */
 
 .btn {

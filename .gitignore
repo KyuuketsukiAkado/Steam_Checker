@@ -1,6 +1,10 @@
 # ключи и секреты
 steam_key.txt
 *.key
+.dev.vars
+.env
+.env.*
+!.env.example
 
 # кэш скрипта (локальный, одноразовый).
 # ВАЖНО: словарь жанров assets/data/genres.json — НЕ кэш, он коммитится.

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
+  "name": "steam-wrapped-api",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-09-03",
+  "workers_dev": true,
+
+  // The API key is intentionally absent. Add it in Cloudflare as the
+  // STEAM_API_KEY Secret — never in this file or a .dev.vars file committed to Git.
+  "vars": {
+    "API_ENABLED": "true",
+    "DAILY_STEAM_CALL_LIMIT": "900"
+  },
+
+  // Deploy refuses to continue if the production Worker has no runtime secret.
+  // The value still lives only in Cloudflare; this declares the name, not the key.
+  "secrets": {
+    "required": ["STEAM_API_KEY"]
+  },
+
+  "kv_namespaces": [
+    {
+      "binding": "STEAM_CACHE",
+      "id": "d175976cb82a4e659a13002ffa9f9582"
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RATE_LIMITER",
+        "class_name": "RateLimiter"
+      }
+    ]
+  },
+
+  "exports": {
+    "RateLimiter": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}

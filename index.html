@@ -56,6 +56,21 @@
       рабочие месяцы. <b>Без стыда, но с интересом.</b>
     </p>
 
+    <form class="profile-form" id="profileForm" novalidate>
+      <label class="profile-form__label" for="profileInput">Собрать wrapped для публичного Steam-профиля</label>
+      <div class="profile-form__row">
+        <input class="profile-form__input" id="profileInput" name="profile" type="text"
+               inputmode="url" autocomplete="url" maxlength="400"
+               placeholder="SteamID64, ник или ссылка на steamcommunity.com"
+               aria-describedby="profileStatus">
+        <button class="btn btn--solid" type="submit">Построить wrapped</button>
+      </div>
+      <p class="profile-form__status" id="profileStatus" aria-live="polite">
+        Библиотека в Steam должна быть открыта для просмотра.
+      </p>
+      <a class="profile-form__reset" id="profileReset" href="./" hidden>Вернуться к исходной статистике</a>
+    </form>
+
     <div class="hero__actions">
       <a class="btn btn--solid" href="#fate">Судьба вечера ↘</a>
       <a class="btn" href="#share">Поделиться карточкой</a>

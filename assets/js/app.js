@@ -7,11 +7,13 @@
 
   // Страница рисуется из одного ProfileViewData: сейчас это статичный data.js,
   // позже сюда же придёт нормализованный ответ Worker для профиля друга.
-  function boot(rules) {
+  function boot(rules, profileViewData) {
     var dataLayer = window.SteamWrappedData;
-    var D = window.STEAM_DATA;
+    var D = profileViewData || window.STEAM_DATA;
     if (!D) { console.error("Нет данных: assets/js/data.js не загрузился"); return; }
-    if (dataLayer) D = dataLayer.normalizeStaticData(D, rules);
+    // Для исходного data.js сохраняем прежний путь нормализации. Данные,
+    // полученные Worker, уже нормализованы через normalizeSteamData() до boot.
+    if (dataLayer && !profileViewData) D = dataLayer.normalizeStaticData(D, rules);
 
   var $  = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
@@ -841,9 +843,189 @@
   $$(".reveal").forEach(function (n) { revealObserver.observe(n); });
   }
 
+  // Статичная карточка не вызывает Worker сама. Живой запрос возможен только
+  // после отправки формы или при явном ?profile= в адресе.
+  var WORKER_ORIGIN = "https://steam-wrapped-api.repro4chful.workers.dev";
+  var PAGES_ORIGIN = "https://kyuuketsukiakado.github.io";
+  var MAX_LIVE_GENRE_APPIDS = 8;
+
+  function profileQuery() {
+    try { return new URL(window.location.href).searchParams.get("profile") || ""; }
+    catch (_) { return ""; }
+  }
+
+  function setProfileStatus(message, state) {
+    var node = document.getElementById("profileStatus");
+    if (!node) return;
+    node.textContent = message;
+    node.className = "profile-form__status" + (state ? " is-" + state : "");
+  }
+
+  function resetProfileUrl() {
+    var url = new URL(window.location.href);
+    url.searchParams.delete("profile");
+    return url.href;
+  }
+
+  function wireProfileForm(dataLayer) {
+    var form = document.getElementById("profileForm");
+    var input = document.getElementById("profileInput");
+    var reset = document.getElementById("profileReset");
+    var requested = profileQuery();
+    if (!form || !input) return;
+
+    if (requested) {
+      input.value = requested;
+      if (reset) {
+        reset.hidden = false;
+        reset.href = resetProfileUrl();
+      }
+    }
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var value = input.value.trim();
+      if (!dataLayer.validateProfileInput(value)) {
+        setProfileStatus("Введи SteamID64, ник или обычную ссылку на профиль Steam.", "error");
+        input.focus();
+        return;
+      }
+      var url = new URL(window.location.href);
+      url.searchParams.set("profile", value);
+      window.location.assign(url.href);
+    });
+  }
+
+  function workerErrorMessage(code) {
+    var messages = {
+      invalid_profile_input: "Не удалось распознать SteamID, ник или ссылку на профиль.",
+      profile_not_found: "Steam не нашёл этот публичный профиль.",
+      profile_games_unavailable: "Steam не отдал библиотеку. Проверь, что список игр открыт для просмотра.",
+      rate_limit_reached: "Слишком много запросов. Попробуй немного позже.",
+      daily_limit_reached: "Дневной лимит запросов уже исчерпан. Попробуй завтра.",
+      upstream_unavailable: "Steam временно не отвечает. Попробуй немного позже.",
+      api_disabled: "Живое обновление временно отключено."
+    };
+    return messages[code] || "Сервис временно недоступен. Попробуй немного позже.";
+  }
+
+  function workerJson(path, options) {
+    return fetch(WORKER_ORIGIN + path, options).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (data) {
+        if (!response.ok) {
+          var err = new Error((data.error && data.error.code) || "service_unavailable");
+          err.code = (data.error && data.error.code) || "service_unavailable";
+          throw err;
+        }
+        return data;
+      });
+    }).catch(function (error) {
+      // Ошибки сети/CORS не пробрасываем в DOM или логи с техническими деталями.
+      if (error && error.code) throw error;
+      var err = new Error("network_unavailable");
+      err.code = "network_unavailable";
+      throw err;
+    });
+  }
+
+  function loadSeedGenres() {
+    return fetch("assets/data/genres.json", { credentials: "same-origin" })
+      .then(function (response) { return response.ok ? response.json() : {}; })
+      .then(function (genres) {
+        return genres && typeof genres === "object" && !Array.isArray(genres) ? genres : {};
+      })
+      .catch(function () { return {}; });
+  }
+
+  function rawOwnedGames(raw) {
+    var owned = raw && raw.owned && raw.owned.response;
+    return owned && Array.isArray(owned.games) ? owned.games : [];
+  }
+
+  function missingGenreAppids(raw, seedGenres) {
+    return rawOwnedGames(raw)
+      .filter(function (game) {
+        var id = String(game && game.appid || "");
+        return /^[1-9]\d{0,9}$/.test(id) && Number(game.playtime_forever || 0) > 0 && !seedGenres[id];
+      })
+      .sort(function (a, b) { return Number(b.playtime_forever || 0) - Number(a.playtime_forever || 0); })
+      .slice(0, MAX_LIVE_GENRE_APPIDS)
+      .map(function (game) { return Number(game.appid); });
+  }
+
+  function loadLiveProfile(profile, rules, dataLayer) {
+    var encodedProfile = encodeURIComponent(profile);
+    return Promise.all([
+      workerJson("/v1/profile?profile=" + encodedProfile),
+      loadSeedGenres()
+    ]).then(function (result) {
+      var raw = result[0];
+      var seedGenres = result[1];
+      var appids = missingGenreAppids(raw, seedGenres);
+      if (!appids.length) return { raw: raw, seedGenres: seedGenres, genreWarning: false };
+
+      // Ровно один ограниченный запрос жанров: максимум восемь наиболее
+      // значимых неизвестных игр. Worker принимает только фиксированный маршрут.
+      return workerJson("/v1/genres", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ appids: appids })
+      }).then(function (genres) {
+        raw.genreHints = genres && genres.genres && typeof genres.genres === "object" ? genres.genres : {};
+        return { raw: raw, seedGenres: seedGenres, genreWarning: false };
+      }).catch(function () {
+        // Профиль остаётся полезен даже при кратком сбое SteamSpy: доступны
+        // накопленные жанры из статичного словаря, а расчёты не перемещаются в Worker.
+        return { raw: raw, seedGenres: seedGenres, genreWarning: true };
+      });
+    }).then(function (payload) {
+      return {
+        data: dataLayer.normalizeSteamData(payload.raw, rules, payload.seedGenres),
+        genreWarning: payload.genreWarning
+      };
+    });
+  }
+
+  function start(rules, dataLayer) {
+    wireProfileForm(dataLayer);
+    var staticData = dataLayer.normalizeStaticData(window.STEAM_DATA, rules);
+    var requested = profileQuery();
+    if (!requested) {
+      boot(rules, staticData);
+      return;
+    }
+    if (!dataLayer.validateProfileInput(requested)) {
+      setProfileStatus("Не удалось распознать SteamID, ник или ссылку на профиль.", "error");
+      boot(rules, staticData);
+      return;
+    }
+    // CORS сознательно ограничен опубликованным GitHub Pages. Preview Arena
+    // показывает интерфейс, но не должен становиться дополнительным origin API.
+    if (window.location.origin !== PAGES_ORIGIN) {
+      setProfileStatus("Живой профиль доступен на опубликованной GitHub Pages-странице.", "error");
+      boot(rules, staticData);
+      return;
+    }
+
+    setProfileStatus("Получаю публичные данные Steam…", "loading");
+    loadLiveProfile(requested, rules, dataLayer).then(function (result) {
+      setProfileStatus(
+        result.genreWarning
+          ? "Профиль построен. Часть жанров временно недоступна."
+          : "Профиль построен из публичных данных Steam.",
+        result.genreWarning ? "" : "ok"
+      );
+      boot(rules, result.data);
+    }).catch(function (error) {
+      setProfileStatus(workerErrorMessage(error && error.code), "error");
+      boot(rules, staticData);
+    });
+  }
+
   // rules.json — обычный статичный файл GitHub Pages, не запрос к Worker.
   // Если страницу открыли прямо как file:// и браузер запретил fetch, рендерим
-  // всё равно: профиль доступен, только тематический факт будет нейтральным.
+  // исходную статичную карточку: профиль доступен, только тематический факт
+  // будет нейтральным.
   var dataLayer = window.SteamWrappedData;
   if (!dataLayer) {
     console.warn("Не загрузился общий слой данных; использую data.js напрямую");
@@ -857,7 +1039,9 @@
   var rulesUrl = layerScript && layerScript.src
     ? new URL("../data/rules.json", layerScript.src).href
     : "assets/data/rules.json";
-  dataLayer.loadRules(rulesUrl).then(boot).catch(function (error) {
+  dataLayer.loadRules(rulesUrl).then(function (rules) {
+    start(rules, dataLayer);
+  }).catch(function (error) {
     console.warn("rules.json не загрузился; включён нейтральный режим", error);
     boot(null);
   });

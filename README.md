@@ -48,7 +48,8 @@ extra_games.json            игры, которых API не отдаёт (Dota
 tools/selftest.py           офлайн-проверка Python-сборщика на моках
 tools/test_profile_data.js  офлайн-проверка общего JS-слоя данных
 tools/make_og.py            перегенерация og-картинки из data.js
-.github/workflows/          автообновление и сборка карточек друзей
+.github/workflows/          автообновление и временный режим карточек друзей
+workers/steam-wrapped-api/  код будущего Cloudflare Worker (без секрета, пока не задеплоен)
 ИНСТРУКЦИЯ.md               пошаговое руководство по запуску
 ```
 

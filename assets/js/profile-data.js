@@ -341,6 +341,9 @@
   function validateProfileInput(value) {
     var input = string(value, "", 400);
     if (/^\d{17}$/.test(input)) return { kind: "steamid", value: input };
+    // Числовой ввод — только SteamID64; в противном случае это, вероятно,
+    // опечатка, а не vanity-ник.
+    if (/^\d+$/.test(input)) return null;
     if (/^[A-Za-z0-9_-]{2,64}$/.test(input)) return { kind: "vanity", value: input };
 
     try {

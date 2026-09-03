@@ -64,6 +64,7 @@ assert.equal(friend.meta.avatar, "https://avatars.steamstatic.com/avatar.jpg");
 
 assert.deepEqual(Data.validateProfileInput("76561198000000000"), { kind: "steamid", value: "76561198000000000" });
 assert.deepEqual(Data.validateProfileInput("https://steamcommunity.com/id/K_Ak4d0/?xml=1"), { kind: "vanity", value: "K_Ak4d0" });
+assert.equal(Data.validateProfileInput("7656119800000000"), null);
 assert.equal(Data.validateProfileInput("https://example.com/anything"), null);
 assert.equal(Data.validateProfileInput("https://steamcommunity.com/id/foo/extra"), null);
 

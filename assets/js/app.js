@@ -7,7 +7,7 @@
 
   // Страница рисуется из одного ProfileViewData: сейчас это статичный data.js,
   // позже сюда же придёт нормализованный ответ Worker для профиля друга.
-  function boot(rules, profileViewData) {
+  function boot(rules, profileViewData, isDemoProfile) {
     var dataLayer = window.SteamWrappedData;
     var D = profileViewData || window.STEAM_DATA;
     if (!D) { console.error("Нет данных: assets/js/data.js не загрузился"); return; }
@@ -108,16 +108,13 @@
 
   /* ---------- шапка ---------- */
 
-  document.title = "Steam Wrapped · " + (D.meta.persona || "profile");
-  $("#brandName").textContent = D.meta.persona || "—";
+  var profileName = D.meta.persona || "steam profile";
+  document.title = "Steam Wrapped · " + (isDemoProfile ? "пример: " : "") + profileName;
   $("#year").textContent = new Date().getFullYear();
-  $("#heroEyebrow").textContent = "Личная статистика" +
+  $("#heroEyebrow").textContent = (isDemoProfile ? "Демо-профиль" : "Профиль Steam") +
+    " · " + profileName +
     (D.meta.memberSince ? " · в Steam с " + fmtDate(D.meta.memberSince) : "") +
     " · данные от " + fmtDate(D.meta.generatedAt);
-  var heroTitle = $$(".hero__title")[0];
-  heroTitle.textContent = D.meta.persona || "profile";
-  heroTitle.appendChild(document.createElement("br"));
-  heroTitle.appendChild(el("b", "", "в цифрах."));
 
   var pl = $("#profileLink");
   if (D.meta.profileUrl) pl.href = D.meta.profileUrl; else pl.style.display = "none";
@@ -991,19 +988,19 @@
     var staticData = dataLayer.normalizeStaticData(window.STEAM_DATA, rules);
     var requested = profileQuery();
     if (!requested) {
-      boot(rules, staticData);
+      boot(rules, staticData, true);
       return;
     }
     if (!dataLayer.validateProfileInput(requested)) {
       setProfileStatus("Не удалось распознать SteamID, ник или ссылку на профиль.", "error");
-      boot(rules, staticData);
+      boot(rules, staticData, true);
       return;
     }
     // CORS сознательно ограничен опубликованным GitHub Pages. Preview Arena
     // показывает интерфейс, но не должен становиться дополнительным origin API.
     if (window.location.origin !== PAGES_ORIGIN) {
       setProfileStatus("Живой профиль доступен на опубликованной GitHub Pages-странице.", "error");
-      boot(rules, staticData);
+      boot(rules, staticData, true);
       return;
     }
 
@@ -1015,10 +1012,10 @@
           : "Профиль построен из публичных данных Steam.",
         result.genreWarning ? "" : "ok"
       );
-      boot(rules, result.data);
+      boot(rules, result.data, false);
     }).catch(function (error) {
       setProfileStatus(workerErrorMessage(error && error.code), "error");
-      boot(rules, staticData);
+      boot(rules, staticData, true);
     });
   }
 
@@ -1029,7 +1026,7 @@
   var dataLayer = window.SteamWrappedData;
   if (!dataLayer) {
     console.warn("Не загрузился общий слой данных; использую data.js напрямую");
-    boot(null);
+    boot(null, null, true);
     return;
   }
   var layerScript = Array.prototype.slice.call(document.querySelectorAll("script[src]"))
@@ -1043,6 +1040,6 @@
     start(rules, dataLayer);
   }).catch(function (error) {
     console.warn("rules.json не загрузился; включён нейтральный режим", error);
-    boot(null);
+    boot(null, null, true);
   });
 })();

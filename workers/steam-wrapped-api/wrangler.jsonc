@@ -15,7 +15,7 @@
   "kv_namespaces": [
     {
       "binding": "STEAM_CACHE",
-      "id": "REPLACE_WITH_CLOUDFLARE_KV_NAMESPACE_ID"
+      "id": "d175976cb82a4e659a13002ffa9f9582"
     }
   ],
 
@@ -28,10 +28,10 @@
     ]
   },
 
-  "migrations": [
-    {
-      "tag": "v1-rate-limiter",
-      "new_sqlite_classes": ["RateLimiter"]
+  "exports": {
+    "RateLimiter": {
+      "type": "durable-object",
+      "storage": "sqlite"
     }
-  ]
+  }
 }

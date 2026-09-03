@@ -43,6 +43,10 @@ const alienOrigin = await Worker.fetch(new Request("https://worker.example/healt
 assert.equal(alienOrigin.status, 403);
 assert.equal(alienOrigin.headers.get("access-control-allow-origin"), null);
 
+const noSecret = await Worker.fetch(new Request("https://worker.example/v1/profile?profile=76561198000000000"), {});
+assert.equal(noSecret.status, 503);
+assert.equal((await noSecret.json()).error.code, "steam_key_not_configured");
+
 // Мини-стенд профиля: Worker возвращает три неочищенных Steam-ответа и
 // второй раз обслуживает тот же SteamID из KV, не вызывая Steam повторно.
 const cache = new Map();

@@ -12,6 +12,12 @@
     "DAILY_STEAM_CALL_LIMIT": "900"
   },
 
+  // Deploy refuses to continue if the production Worker has no runtime secret.
+  // The value still lives only in Cloudflare; this declares the name, not the key.
+  "secrets": {
+    "required": ["STEAM_API_KEY"]
+  },
+
   "kv_namespaces": [
     {
       "binding": "STEAM_CACHE",

@@ -321,9 +321,20 @@ async function profilePayload(env, key, steamid) {
   return { cached: false, data };
 }
 
+function runtimeConfigurationError(env, request, needsSteamKey) {
+  // These names are public configuration contracts, not values. Splitting the
+  // error prevents a vague 503 from sending an owner on a key-reset wild-goose
+  // chase while still never disclosing a secret or its length.
+  if (needsSteamKey && !env.STEAM_API_KEY) return error("steam_key_not_configured", 503, request);
+  if (!env.STEAM_CACHE) return error("cache_not_configured", 503, request);
+  if (!env.RATE_LIMITER) return error("rate_limiter_not_configured", 503, request);
+  return null;
+}
+
 async function handleProfile(request, env) {
   if (!enabled(env)) return error("api_disabled", 503, request);
-  if (!env.STEAM_API_KEY || !env.STEAM_CACHE || !env.RATE_LIMITER) return error("service_misconfigured", 503, request);
+  const configurationError = runtimeConfigurationError(env, request, true);
+  if (configurationError) return configurationError;
 
   const input = parseProfileInput(new URL(request.url).searchParams.get("profile"));
   if (!input) return error("invalid_profile_input", 400, request);
@@ -349,7 +360,8 @@ async function handleProfile(request, env) {
 
 async function handleGenres(request, env) {
   if (!enabled(env)) return error("api_disabled", 503, request);
-  if (!env.STEAM_CACHE || !env.RATE_LIMITER) return error("service_misconfigured", 503, request);
+  const configurationError = runtimeConfigurationError(env, request, false);
+  if (configurationError) return configurationError;
 
   let body;
   try {

@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "gameFilters": {
+    "skipAppids": [250820, 323910, 228980, 365670, 431960],
+    "skipNameParts": ["wallpaper engine", "sharex", "jackbox megapicker"],
+    "testBranchPatterns": ["test server", "staging branch", "\\(beta\\)", "dedicated server", "\\bsdk\\b", "benchmark"]
+  },
+  "nameCleanup": {
+    "trademarkPattern": "[™®©]",
+    "editionSuffixPattern": "\\s*[-–—:]*\\s*(complete|enhanced|definitive|goty|game of the year)(\\s+edition)?\\s*$",
+    "trailingPunctuation": " -–—:,"
+  },
+  "genres": {
+    "translate": {
+      "Action": "Экшен",
+      "Adventure": "Приключения",
+      "RPG": "RPG",
+      "Strategy": "Стратегия",
+      "Simulation": "Симулятор",
+      "Indie": "Инди",
+      "Casual": "Казуальные",
+      "Sports": "Спорт",
+      "Racing": "Гонки",
+      "Massively Multiplayer": "MMO",
+      "Free To Play": "Free to Play",
+      "Free to Play": "Free to Play",
+      "Early Access": "Ранний доступ",
+      "Violent": "Жестокие",
+      "Gore": "Жестокие",
+      "Nudity": "18+",
+      "Sexual Content": "18+",
+      "Utilities": "Утилиты",
+      "Design & Illustration": "Творчество",
+      "Animation & Modeling": "Творчество",
+      "Video Production": "Видео",
+      "Audio Production": "Аудио",
+      "Photo Editing": "Фото",
+      "Game Development": "Геймдев",
+      "Education": "Образование",
+      "Software Training": "Обучение",
+      "Web Publishing": "Веб",
+      "Accounting": "Утилиты",
+      "Movie": "Кино",
+      "Documentary": "Кино",
+      "Episodic": "Кино",
+      "Short": "Кино",
+      "Tutorial": "Обучение"
+    },
+    "drop": [
+      "Free to Play",
+      "Free To Play",
+      "Ранний доступ",
+      "Early Access",
+      "18+",
+      "Nudity",
+      "Sexual Content",
+      "Утилиты",
+      "Utilities"
+    ],
+    "maxPerGame": 2
+  },
+  "soulmateUnits": {
+    "byAppid": {
+      "570": {
+        "minutes": 38,
+        "word": "матчей",
+        "note": "по 38 минут — столько длится средняя катка"
+      },
+      "413150": {
+        "minutes": 14,
+        "word": "фермерских дней",
+        "note": "примерно по 14 минут игрового времени каждый"
+      }
+    },
+    "byNamePattern": [
+      {
+        "pattern": "dota|league of legends|smite|deadlock|heroes of the storm",
+        "minutes": 38,
+        "word": "матчей",
+        "note": "по 38 минут — столько длится средняя катка"
+      },
+      {
+        "pattern": "counter-strike|valorant|rainbow six|call of duty",
+        "minutes": 2.5,
+        "word": "раундов",
+        "note": "если считать по 2,5 минуты на каждый"
+      },
+      {
+        "pattern": "stardew|animal crossing|\\bsims?\\b",
+        "minutes": 14,
+        "word": "игровых дней",
+        "note": "примерно по 14 минут игрового времени каждый"
+      }
+    ],
+    "byGenre": [
+      {
+        "genre": "Гонки",
+        "minutes": 6,
+        "word": "заездов",
+        "note": "по шесть минут за круг почёта"
+      },
+      {
+        "genre": "Стратегия",
+        "minutes": 45,
+        "word": "партий",
+        "note": "по 45 минут — от первого хода до победы"
+      }
+    ],
+    "fallback": {
+      "minutes": 120,
+      "word": "вечеров",
+      "note": "по два часа, от «на часик» до «ещё один»"
+    }
+  }
+}

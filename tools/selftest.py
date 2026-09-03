@@ -16,7 +16,9 @@
   * названия чистятся от ™ и «Complete/Enhanced Edition»;
   * extra_games.json подмешивается (Dota 2 становится игрой жизни);
   * часы по жанрам (genreHours) считаются с делением между жанрами игры;
-  * data.js компактный: одна игра на строку, и парсится как JSON.
+  * data.js компактный: одна игра на строку, и парсится как JSON;
+  * общие правила действительно читаются из assets/data/rules.json;
+  * ник с «</script>» безопасно экранируется в генерируемом data.js.
 """
 import glob
 import json
@@ -130,6 +132,14 @@ F.main()
 out = open(F.OUT_FILE, encoding="utf-8").read()
 assert out.startswith("/*") and "window.STEAM_DATA" in out, "формат файла сломан"
 payload = json.loads(out[out.index("{"):out.rindex("}") + 1])
+
+# Единый rules.json подхватился Python-частью, а не остался файлом «для вида».
+assert 431960 in F.SKIP_APPIDS and F.GENRE_RU["Action"] == "Экшен"
+
+# Steam-имя не должно иметь шанса закрыть подключаемый <script> data.js.
+unsafe = F.json_for_script({"persona": "</script><img src=x onerror=alert(1)>"})
+assert "</script" not in unsafe.lower(), unsafe
+assert json.loads(unsafe)["persona"].startswith("</script>"), unsafe
 
 # мета и итоги
 assert payload["meta"]["source"] == "steam-api"

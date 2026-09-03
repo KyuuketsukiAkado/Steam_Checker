@@ -5,8 +5,13 @@
 (function () {
   "use strict";
 
-  var D = window.STEAM_DATA;
-  if (!D) { console.error("Нет данных: assets/js/data.js не загрузился"); return; }
+  // Страница рисуется из одного ProfileViewData: сейчас это статичный data.js,
+  // позже сюда же придёт нормализованный ответ Worker для профиля друга.
+  function boot(rules) {
+    var dataLayer = window.SteamWrappedData;
+    var D = window.STEAM_DATA;
+    if (!D) { console.error("Нет данных: assets/js/data.js не загрузился"); return; }
+    if (dataLayer) D = dataLayer.normalizeStaticData(D, rules);
 
   var $  = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
@@ -31,11 +36,26 @@
     return n.toLocaleString("ru-RU", { minimumFractionDigits: d, maximumFractionDigits: d });
   }
 
-  function el(tag, cls, html) {
+  // Любая строка из Steam — внешние данные. Базовый конструктор всегда
+  // вставляет её как текст, а не как HTML: ник с «<...>» не станет разметкой.
+  function el(tag, cls, text) {
     var e = document.createElement(tag);
     if (cls) e.className = cls;
-    if (html !== undefined) e.innerHTML = html;
+    if (text !== undefined) e.textContent = text;
     return e;
+  }
+
+  function appendBold(parent, text) {
+    parent.appendChild(el("b", "", text));
+    return parent;
+  }
+
+  function setRichText(node, parts) {
+    node.textContent = "";
+    parts.forEach(function (part) {
+      if (part && typeof part === "object" && part.bold !== undefined) appendBold(node, part.bold);
+      else node.appendChild(document.createTextNode(String(part)));
+    });
   }
 
   function parseDate(iso) {
@@ -92,7 +112,10 @@
   $("#heroEyebrow").textContent = "Личная статистика" +
     (D.meta.memberSince ? " · в Steam с " + fmtDate(D.meta.memberSince) : "") +
     " · данные от " + fmtDate(D.meta.generatedAt);
-  $$(".hero__title")[0].innerHTML = (D.meta.persona || "profile") + "<br><b>в цифрах.</b>";
+  var heroTitle = $$(".hero__title")[0];
+  heroTitle.textContent = D.meta.persona || "profile";
+  heroTitle.appendChild(document.createElement("br"));
+  heroTitle.appendChild(el("b", "", "в цифрах."));
 
   var pl = $("#profileLink");
   if (D.meta.profileUrl) pl.href = D.meta.profileUrl; else pl.style.display = "none";
@@ -102,15 +125,16 @@
     var img = new Image();
     img.src = D.meta.avatar;
     img.alt = D.meta.persona || "avatar";
-    img.onload = function () { av.innerHTML = ""; av.appendChild(img); };
+    img.onload = function () { av.textContent = ""; av.appendChild(img); };
     img.onerror = function () { av.textContent = (D.meta.persona || "?").charAt(0).toUpperCase(); };
   } else {
     av.textContent = (D.meta.persona || "?").charAt(0).toUpperCase();
   }
 
-  $("#sourceBadge").innerHTML = "источник данных: <b>" +
-    (D.meta.source === "steam-api" ? "Steam Web API" :
-     D.meta.source === "manual" ? "ручная сборка" : "образец") + "</b>";
+  var sourceBadge = $("#sourceBadge");
+  sourceBadge.textContent = "источник данных: ";
+  appendBold(sourceBadge, D.meta.source === "steam-api" ? "Steam Web API" :
+    D.meta.source === "manual" ? "ручная сборка" : "образец");
 
   /* ---------- подсказки под главными цифрами ---------- */
 
@@ -163,8 +187,16 @@
       D.meta.memberSince ? "в Steam с " + new Date(D.meta.memberSince).getFullYear() + " года" : "",
       "и это только Steam"
     ].filter(Boolean);
-    var line = items.map(function (t) { return "<span><i>✦</i>" + t + "</span>"; }).join("");
-    $("#marquee").innerHTML = line + line; // дубль для бесшовной прокрутки
+    var marqueeNode = $("#marquee");
+    marqueeNode.textContent = "";
+    // Дубль нужен для бесшовной прокрутки. Создаём DOM-узлы, а не HTML-строку:
+    // один из пунктов содержит имя игры, пришедшее от Steam.
+    items.concat(items).forEach(function (text) {
+      var item = el("span");
+      item.appendChild(el("i", "", "✦"));
+      item.appendChild(document.createTextNode(text));
+      marqueeNode.appendChild(item);
+    });
   })();
 
   /* ---------- 01 · главная игра жизни ---------- */
@@ -172,23 +204,11 @@
   if (soulmate) {
     var h = soulmate.hours;
 
-    /* единица пересчёта подбирается под саму игру: у Доты матчи,
-       у шутеров раунды, у фермы игровые дни, дальше — по жанру */
-    var unit = (function (g) {
-      var name = g.name.toLowerCase();
-      var genres = (g.genres || []).join(" ");
-      if (/dota|league of legends|smite|deadlock|heroes of the storm/.test(name))
-        return { min: 38, word: "матчей", note: "по 38 минут — столько длится средняя катка" };
-      if (/counter-strike|valorant|rainbow six|call of duty/.test(name))
-        return { min: 2.5, word: "раундов", note: "если считать по 2,5 минуты на каждый" };
-      if (/stardew|animal crossing|sims/.test(name))
-        return { min: 20, word: "игровых дней", note: "по 20 минут реального времени каждый" };
-      if (/Гонки/.test(genres))
-        return { min: 6, word: "заездов", note: "по шесть минут за круг почёта" };
-      if (/Стратегия/.test(genres))
-        return { min: 45, word: "партий", note: "по 45 минут — от первого хода до победы" };
-      return { min: 120, word: "вечеров", note: "по два часа, от «на часик» до «ещё один»" };
-    })(soulmate);
+    // Правила лежат в общем rules.json: для своего и чужого профиля
+    // пересчёт выбирается одинаково — AppID → название → жанр → fallback.
+    var unit = dataLayer && dataLayer.soulmateUnit
+      ? dataLayer.soulmateUnit(soulmate, rules)
+      : { min: 120, word: "вечеров", note: "по два часа, от «на часик» до «ещё один»" };
 
     $("#smName").textContent = soulmate.name;
     $("#smShare").textContent =
@@ -196,21 +216,23 @@
       (soulmate.lastPlayed ? "Последний заход — " + fmtDate(soulmate.lastPlayed) + "." : "");
 
     var facts = [
-      [dec(h / 24, 1),        "<b>дней</b> подряд, без сна, еды и уведомлений"],
-      [dec(h / 168, 1),       "<b>рабочих месяцев</b> по 40 часов в неделю"],
-      [dec(h / 8760 * 100, 1) + "%", "календарного <b>года жизни</b>"],
-      [num(h / 11.4),         "<b>трилогий «Властелин колец»</b> в режиссёрской версии"],
-      [dec(h / 600, 1),       "<b>иностранных языков</b> до уверенного B2 (600 ч каждый)"],
-      [num(h * 5),            "<b>километров</b> пешком, если бы шла вместо игры — это дальше, чем от Минска до Токио"],
-      [num(h * 60 / unit.min), "<b>" + unit.word + "</b> " + unit.note],
-      [dec(h / 3.5, 0),       "<b>марафонов</b> можно было бы пробежать (по 3,5 ч)"]
+      [dec(h / 24, 1),        [{ bold: "дней" }, " подряд, без сна, еды и уведомлений"]],
+      [dec(h / 168, 1),       [{ bold: "рабочих месяцев" }, " по 40 часов в неделю"]],
+      [dec(h / 8760 * 100, 1) + "%", ["календарного ", { bold: "года жизни" }]],
+      [num(h / 11.4),         [{ bold: "трилогий «Властелин колец»" }, " в режиссёрской версии"]],
+      [dec(h / 600, 1),       [{ bold: "иностранных языков" }, " до уверенного B2 (600 ч каждый)"]],
+      [num(h * 5),            [{ bold: "километров" }, " пешком, если бы шла вместо игры — это дальше, чем от Минска до Токио"]],
+      [num(h * 60 / unit.min), [{ bold: unit.word }, " " + unit.note]],
+      [dec(h / 3.5, 0),       [{ bold: "марафонов" }, " можно было бы пробежать (по 3,5 ч)"]]
     ];
 
     var fw = $("#facts");
     facts.forEach(function (f) {
       var row = el("div", "fact");
       row.appendChild(el("div", "fact__num", f[0]));
-      row.appendChild(el("div", "fact__text", f[1]));
+      var text = el("div", "fact__text");
+      setRichText(text, f[1]);
+      row.appendChild(text);
       fw.appendChild(row);
     });
   }
@@ -238,25 +260,27 @@
       return colossi ? tail[i - 2] : ramp[i];
     });
 
-    // подпись к секции считается на лету — зависит от расклада часов
+    // Подпись к секции считается на лету. Имена игр — внешние данные,
+    // поэтому собираем текст узлами, а не склейкой HTML.
     var note = $("#topNote");
     if (note) {
       var topSum = top.reduce(function (s, g) { return s + g.hours; }, 0);
       var rest9 = topSum - top[0].hours;
       var leadShare = top[0].hours / topSum * 100;
-      var txt;
+      var parts;
       if (top[0].hours >= rest9) {
-        txt = "Одна игра забрала больше времени, чем остальные девять вместе — " +
-              "<b>" + dec(leadShare, 0) + "%</b> всей десятки. Длина полос — доля от лидера.";
+        parts = ["Одна игра забрала больше времени, чем остальные девять вместе — ",
+          { bold: dec(leadShare, 0) + "%" }, " всей десятки. Длина полос — доля от лидера."];
       } else if (colossi) {
-        txt = "Два колосса почти вровень: <b>" + top[0].name + "</b> и <b>" + top[1].name +
-              "</b> держат <b>" + dec((top[0].hours + top[1].hours) / topSum * 100, 0) +
-              "%</b> времени десятки. Дальше — уже про вкус, а не про привычку.";
+        parts = ["Два колосса почти вровень: ", { bold: top[0].name }, " и ",
+          { bold: top[1].name }, " держат ",
+          { bold: dec((top[0].hours + top[1].hours) / topSum * 100, 0) + "%" },
+          " времени десятки. Дальше — уже про вкус, а не про привычку."];
       } else {
-        txt = "Лидер — только <b>" + dec(leadShare, 0) + "%</b> десятки: время честно " +
-              "размазано по разным играм. Длина полос — доля от лидера.";
+        parts = ["Лидер — только ", { bold: dec(leadShare, 0) + "%" },
+          " десятки: время честно размазано по разным играм. Длина полос — доля от лидера."];
       }
-      note.innerHTML = txt;
+      setRichText(note, parts);
     }
 
     top.forEach(function (g, i) {
@@ -277,7 +301,9 @@
       body.appendChild(track);
       row.appendChild(body);
 
-      row.appendChild(el("div", "bar__value", num(g.hours) + "<span>ч</span>"));
+      var value = el("div", "bar__value", num(g.hours));
+      value.appendChild(el("span", "", "ч"));
+      row.appendChild(value);
       wrap.appendChild(row);
     });
 
@@ -309,7 +335,9 @@
     }
 
     if (!list.length) {
-      wrap.appendChild(el("div", "rcard", "<div class='rcard__name'>Тишина в эфире</div>"));
+      var silent = el("div", "rcard");
+      silent.appendChild(el("div", "rcard__name", "Тишина в эфире"));
+      wrap.appendChild(silent);
       return;
     }
 
@@ -318,13 +346,16 @@
       var card = el("div", "rcard");
       card.style.setProperty("--rc", rc[i % rc.length]);
       var d = daysAgo(g.lastPlayed);
-      card.innerHTML =
-        "<div class='eyebrow'>" + (i === 0 ? "<span class='pulse'></span>главное занятие" : "также в ротации") + "</div>" +
-        "<div class='rcard__name'>" + g.name + "</div>" +
-        "<div class='rcard__big'>" + smartDec(g.hours2w || 0) + "<span>ч за 2 недели</span></div>" +
-        "<div class='rcard__meta'>" +
-          (d === null ? "" : (d === 0 ? "играла сегодня" : d + " " + plural(d, ["день", "дня", "дней"]) + " назад")) +
-          " · всего " + smartDec(g.hours) + " ч</div>";
+      var eyebrow = el("div", "eyebrow");
+      if (i === 0) eyebrow.appendChild(el("span", "pulse"));
+      eyebrow.appendChild(document.createTextNode(i === 0 ? "главное занятие" : "также в ротации"));
+      card.appendChild(eyebrow);
+      card.appendChild(el("div", "rcard__name", g.name));
+      var big = el("div", "rcard__big", smartDec(g.hours2w || 0));
+      big.appendChild(el("span", "", "ч за 2 недели"));
+      card.appendChild(big);
+      var ago = d === null ? "" : (d === 0 ? "играла сегодня" : d + " " + plural(d, ["день", "дня", "дней"]) + " назад");
+      card.appendChild(el("div", "rcard__meta", ago + " · всего " + smartDec(g.hours) + " ч"));
       wrap.appendChild(card);
     });
   })();
@@ -450,10 +481,18 @@
         $("#fateCount").textContent = "В бэклоге " + num(neverPlayed) + " " +
           plural(neverPlayed, ["игра", "игры", "игр"]) +
           ", но их имена подтянутся при ближайшем обновлении данных";
-        stage.innerHTML =
-          "<div class='fate__slot fate__slot--empty'>" + num(neverPlayed) + " игр ждут<br>своего часа</div>" +
-          "<div class='fate__slot fate__slot--empty'>список появится<br>после обновления данных</div>" +
-          "<div class='fate__slot fate__slot--empty'>а пока —<br>решай сама</div>";
+        function emptySlot(lines) {
+          var slot = el("div", "fate__slot fate__slot--empty");
+          lines.forEach(function (line, index) {
+            if (index) slot.appendChild(document.createElement("br"));
+            slot.appendChild(document.createTextNode(line));
+          });
+          return slot;
+        }
+        stage.textContent = "";
+        stage.appendChild(emptySlot([num(neverPlayed) + " игр ждут", "своего часа"]));
+        stage.appendChild(emptySlot(["список появится", "после обновления данных"]));
+        stage.appendChild(emptySlot(["а пока —", "решай сама"]));
       } else {
         $("#fateCount").textContent = "Бэклог пуст — редкое достижение";
       }
@@ -472,14 +511,19 @@
     }
 
     function render(list, rolling) {
-      stage.innerHTML = "";
+      stage.textContent = "";
       list.forEach(function (g, i) {
         var slot = el("div", "fate__slot" + (rolling ? " is-rolling" : ""));
-        slot.innerHTML =
-          "<div class='fate__idx'>ВАРИАНТ " + String(i + 1).padStart(2, "0") + "</div>" +
-          "<div class='fate__name'>" + g.name + "</div>" +
-          "<div class='fate__tags'>" + ((g.genres || []).join(" · ") || "жанр неизвестен") + "</div>" +
-          (g.appid ? "<a class='fate__link' target='_blank' rel='noopener' href='https://store.steampowered.com/app/" + g.appid + "/'>страница в Steam ↗</a>" : "");
+        slot.appendChild(el("div", "fate__idx", "ВАРИАНТ " + String(i + 1).padStart(2, "0")));
+        slot.appendChild(el("div", "fate__name", g.name));
+        slot.appendChild(el("div", "fate__tags", (g.genres || []).join(" · ") || "жанр неизвестен"));
+        if (g.appid) {
+          var link = el("a", "fate__link", "страница в Steam ↗");
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.href = "https://store.steampowered.com/app/" + encodeURIComponent(g.appid) + "/";
+          slot.appendChild(link);
+        }
         stage.appendChild(slot);
       });
     }
@@ -795,4 +839,26 @@
   }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
 
   $$(".reveal").forEach(function (n) { revealObserver.observe(n); });
+  }
+
+  // rules.json — обычный статичный файл GitHub Pages, не запрос к Worker.
+  // Если страницу открыли прямо как file:// и браузер запретил fetch, рендерим
+  // всё равно: профиль доступен, только тематический факт будет нейтральным.
+  var dataLayer = window.SteamWrappedData;
+  if (!dataLayer) {
+    console.warn("Не загрузился общий слой данных; использую data.js напрямую");
+    boot(null);
+    return;
+  }
+  var layerScript = Array.prototype.slice.call(document.querySelectorAll("script[src]"))
+    .filter(function (script) { return /(?:^|\/)profile-data\.js(?:\?|$)/.test(script.src); })[0];
+  // Берём URL от подключённого profile-data.js, а не от адреса страницы:
+  // старые u/<steamid>/ карточки лежат глубже и тоже найдут общий rules.json.
+  var rulesUrl = layerScript && layerScript.src
+    ? new URL("../data/rules.json", layerScript.src).href
+    : "assets/data/rules.json";
+  dataLayer.loadRules(rulesUrl).then(boot).catch(function (error) {
+    console.warn("rules.json не загрузился; включён нейтральный режим", error);
+    boot(null);
+  });
 })();

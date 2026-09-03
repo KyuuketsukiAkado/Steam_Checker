@@ -64,55 +64,69 @@ STORE = "https://store.steampowered.com/api/appdetails"
 STEAMSPY = "https://steamspy.com/api.php"
 UA = "steam-wrapped/1.0 (personal stats page; +https://github.com/KyuuketsukiAkado)"
 
-# store отдаёт жанры на английском — переводим на человеческий
-GENRE_RU = {
-    "Action": "Экшен", "Adventure": "Приключения", "RPG": "RPG",
-    "Strategy": "Стратегия", "Simulation": "Симулятор", "Indie": "Инди",
-    "Casual": "Казуальные", "Sports": "Спорт", "Racing": "Гонки",
-    "Massively Multiplayer": "MMO", "Free To Play": "Free to Play",
-    "Free to Play": "Free to Play", "Early Access": "Ранний доступ",
-    "Violent": "Жестокие", "Gore": "Жестокие", "Nudity": "18+",
-    "Sexual Content": "18+", "Utilities": "Утилиты", "Design & Illustration": "Творчество",
-    "Animation & Modeling": "Творчество", "Video Production": "Видео",
-    "Audio Production": "Аудио", "Photo Editing": "Фото", "Game Development": "Геймдев",
-    "Education": "Образование", "Software Training": "Обучение", "Web Publishing": "Веб",
-    "Accounting": "Утилиты", "Movie": "Кино", "Documentary": "Кино", "Episodic": "Кино",
-    "Short": "Кино", "Tutorial": "Обучение",
-}
+# Правила очистки — единый контракт для Python и браузера. Не держим
+# два расходящихся списка исключений: Worker вернёт сырые данные, а фронтенд
+# применит ровно тот же assets/data/rules.json.
+RULES_FILE = os.path.join(ROOT, "assets", "data", "rules.json")
 
-# метки магазина, а не жанры: съедают часы и портят донат
-DROP_GENRES = {
-    "Free to Play", "Free To Play", "Ранний доступ", "Early Access",
-    "18+", "Nudity", "Sexual Content", "Утилиты", "Utilities",
-}
 
-# служебный софт, который только портит статистику
-SKIP_APPIDS = {
-    250820,   # SteamVR
-    323910,   # SteamVR Performance Test
-    228980,   # Steamworks Common Redistributables
-    365670,   # Blender (иногда числится как игра)
-    431960,   # Wallpaper Engine
-}
+def load_rules():
+    """Читает и минимально валидирует общий файл правил.
 
-# …и то же самое по названию, если appid вдруг другой
-SKIP_NAME_PARTS = {
-    "wallpaper engine",
-    "sharex",
-    "jackbox megapicker",
-}
+    Ошибка здесь намеренно останавливает сборку: если молча подменить правила
+    значениями из кода, Python и фронтенд смогут посчитать одну библиотеку по-
+    разному. schemaVersion позволит поменять формат осознанно в будущем.
+    """
+    try:
+        with open(RULES_FILE, "r", encoding="utf-8") as f:
+            rules = json.load(f)
+    except (OSError, ValueError) as e:
+        sys.exit("Не прочитался общий файл правил %s: %s" % (RULES_FILE, e))
 
-# тестовые и служебные ветки игр: «Dota 2 Test», «… Dedicated Server» и т.п.
+    if not isinstance(rules, dict) or rules.get("schemaVersion") != 1:
+        sys.exit("rules.json: ожидается объект формата schemaVersion 1")
+
+    game_filters = rules.get("gameFilters")
+    name_cleanup = rules.get("nameCleanup")
+    genres = rules.get("genres")
+    soulmate = rules.get("soulmateUnits")
+    valid = (
+        isinstance(game_filters, dict) and isinstance(name_cleanup, dict) and
+        isinstance(genres, dict) and isinstance(soulmate, dict) and
+        isinstance(game_filters.get("skipAppids"), list) and
+        isinstance(game_filters.get("skipNameParts"), list) and
+        isinstance(game_filters.get("testBranchPatterns"), list) and
+        isinstance(name_cleanup.get("editionSuffixPattern"), str) and
+        isinstance(name_cleanup.get("trademarkPattern"), str) and
+        isinstance(name_cleanup.get("trailingPunctuation"), str) and
+        isinstance(genres.get("translate"), dict) and isinstance(genres.get("drop"), list) and
+        isinstance(genres.get("maxPerGame"), int) and isinstance(soulmate.get("fallback"), dict)
+    )
+    if not valid:
+        sys.exit("rules.json: не хватает обязательного правила или у него неверный тип")
+    return rules
+
+
+RULES = load_rules()
+GAME_FILTERS = RULES["gameFilters"]
+NAME_CLEANUP = RULES["nameCleanup"]
+GENRE_RULES = RULES["genres"]
+
+# store и SteamSpy отдают жанры на английском — перевод живёт в rules.json.
+GENRE_RU = GENRE_RULES["translate"]
+DROP_GENRES = set(GENRE_RULES["drop"])
+MAX_GENRES_PER_GAME = GENRE_RULES["maxPerGame"]
+
+# Служебный софт и тестовые ветки — не игры, в статистику не идут.
+SKIP_APPIDS = {int(appid) for appid in GAME_FILTERS["skipAppids"]}
+SKIP_NAME_PARTS = {str(part).lower() for part in GAME_FILTERS["skipNameParts"]}
 TEST_BRANCH_RE = re.compile(
-    r"test server|staging branch|\(beta\)|dedicated server|\bsdk\b|benchmark",
+    "|".join("(?:%s)" % pattern for pattern in GAME_FILTERS["testBranchPatterns"]),
     re.IGNORECASE,
 )
-
-# суффиксы переизданий, которые ничего не говорят об игре
-EDITION_RE = re.compile(
-    r"\s*[-–—:]*\s*(complete|enhanced|definitive|goty|game of the year)(\s+edition)?\s*$",
-    re.IGNORECASE,
-)
+EDITION_RE = re.compile(NAME_CLEANUP["editionSuffixPattern"], re.IGNORECASE)
+TRADEMARK_RE = re.compile(NAME_CLEANUP["trademarkPattern"])
+TRAILING_PUNCTUATION = NAME_CLEANUP["trailingPunctuation"]
 
 
 # --------------------------------------------------------------------------
@@ -121,11 +135,11 @@ EDITION_RE = re.compile(
 def clean_name(name):
     """«Some Game™ - Complete Edition» → «Some Game»."""
     n = html.unescape(name or "").strip()
-    n = re.sub(r"[™®©]", "", n)
+    n = TRADEMARK_RE.sub("", n)
     n = EDITION_RE.sub("", n)
     n = re.sub(r"\s{2,}", " ", n)
     # после срезки суффикса остаётся хвост пунктуации: «The Witcher:» → «The Witcher»
-    n = n.strip(" -–—:,")
+    n = n.strip(TRAILING_PUNCTUATION)
     return n
 
 
@@ -314,7 +328,7 @@ def translate_genres(genres_en):
             continue
         seen.add(ru)
         clean.append(ru)
-    return clean[:2]
+    return clean[:MAX_GENRES_PER_GAME]
 
 
 def genres_from_store(appid, delay):
@@ -541,19 +555,35 @@ def _num(v):
     return v
 
 
+def json_for_script(value):
+    r"""JSON, который безопасно лежит внутри тега <script>.
+
+    Steam разрешает человеку назвать профиль почти чем угодно. Обычный
+    json.dumps не экранирует «</script>», и такое имя могло бы закрыть
+    подключаемый data.js раньше времени. JSON понимает \u-экраны так же,
+    поэтому содержимое данных не меняется, а HTML-разметка остаётся целой.
+    """
+    return (json.dumps(value, ensure_ascii=False)
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029"))
+
+
 def _one_line(d, indent=4):
     """Словарь одной строкой — компактный формат data.js."""
     d = {k: _num(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
          for k, v in d.items()}
-    return " " * indent + json.dumps(d, ensure_ascii=False)
+    return " " * indent + json_for_script(d)
 
 
 def write_data_js(payload, out_file=None):
     """data.js: читаемый заголовок + компактные списки (одна игра на строку)."""
     out_file = out_file or OUT_FILE
-    meta = json.dumps({k: _num(v) if isinstance(v, (int, float)) else v
-                       for k, v in payload["meta"].items()}, ensure_ascii=False)
-    totals = json.dumps({k: _num(v) for k, v in payload["totals"].items()}, ensure_ascii=False)
+    meta = json_for_script({k: _num(v) if isinstance(v, (int, float)) else v
+                            for k, v in payload["meta"].items()})
+    totals = json_for_script({k: _num(v) for k, v in payload["totals"].items()})
 
     genre_rows = ",\n".join(_one_line(g) for g in payload["genreHours"])
     genre_block = ("\n  \"genreHours\": [\n" + genre_rows + "\n  ],\n") if payload["genreHours"] else ""
@@ -578,7 +608,7 @@ def write_data_js(payload, out_file=None):
         "};\n"
     ) % (
         payload["meta"]["generatedAt"],
-        meta, totals, json.dumps(payload["soulmateAppid"]),
+        meta, totals, json_for_script(payload["soulmateAppid"]),
         genre_block, game_rows,
     )
 

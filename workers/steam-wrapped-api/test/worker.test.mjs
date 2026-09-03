@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import Worker, { parseAppids, parseProfileInput } from "../src/index.mjs";
+import Worker, { parseAppids, parseProfileInput } from "../src/worker-core.mjs";
 
 // SteamID64, vanity и две стандартные ссылки — допустимые формы.
 assert.deepEqual(parseProfileInput("76561198000000000"), { kind: "steamid", value: "76561198000000000" });

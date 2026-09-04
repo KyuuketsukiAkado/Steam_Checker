@@ -3,23 +3,23 @@
    -------------------------------------------------------------
    ФАЙЛ СГЕНЕРИРОВАН АВТОМАТИЧЕСКИ: python fetch_data.py
    Правки руками перезапишутся при следующем запуске.
-   Дата сборки: 2026-09-02
+   Дата сборки: 2026-09-04
    Образцовые данные лежат в data.sample.js
    ============================================================= */
 
 window.STEAM_DATA = {
-  "meta": {"persona": "mormyszka", "profileUrl": "https://steamcommunity.com/id/K_Ak4d0/", "avatar": "assets/img/avatar.jpg", "source": "steam-api", "generatedAt": "2026-09-02", "memberSince": "2017-02-02"},
+  "meta": {"persona": "mormyszka", "profileUrl": "https://steamcommunity.com/id/K_Ak4d0/", "avatar": "assets/img/avatar.jpg", "source": "steam-api", "generatedAt": "2026-09-04", "memberSince": "2017-02-02"},
 
-  "totals": {"gamesOwned": 322, "hoursTotal": 7954, "hoursTwoWeeks": 100, "gamesPlayed": 248, "gamesNeverPlayed": 68},
+  "totals": {"gamesOwned": 322, "hoursTotal": 7968, "hoursTwoWeeks": 99, "gamesPlayed": 248, "gamesNeverPlayed": 68},
 
   "soulmateAppid": 570,
 
   "genreHours": [
-    {"name": "Экшен", "hours": 4771},
-    {"name": "Стратегия", "hours": 1485},
+    {"name": "Экшен", "hours": 4776},
+    {"name": "Стратегия", "hours": 1489},
     {"name": "Приключения", "hours": 423},
     {"name": "RPG", "hours": 408},
-    {"name": "Инди", "hours": 309},
+    {"name": "Инди", "hours": 313},
     {"name": "Казуальные", "hours": 176},
     {"name": "Гонки", "hours": 174},
     {"name": "Симулятор", "hours": 28},
@@ -28,14 +28,14 @@ window.STEAM_DATA = {
 
   "games": [
     {"appid": 570, "name": "Dota 2", "hours": 2848.8, "hours2w": 0, "lastPlayed": null, "genres": ["Экшен", "Стратегия"]},
-    {"appid": 730, "name": "Counter-Strike 2", "hours": 2631, "hours2w": 7.5, "lastPlayed": "2026-09-01", "genres": ["Экшен"]},
+    {"appid": 730, "name": "Counter-Strike 2", "hours": 2636, "hours2w": 9.7, "lastPlayed": "2026-09-03", "genres": ["Экшен"]},
     {"appid": 413150, "name": "Stardew Valley", "hours": 313, "hours2w": 0, "lastPlayed": "2026-07-12", "genres": ["Инди", "RPG"]},
     {"appid": 359550, "name": "Tom Clancy's Rainbow Six Siege", "hours": 179, "hours2w": 0, "lastPlayed": "2022-05-28", "genres": ["Экшен"]},
     {"appid": 1293830, "name": "Forza Horizon 4", "hours": 151, "hours2w": 0, "lastPlayed": "2024-11-24", "genres": ["Гонки"]},
     {"appid": 238960, "name": "Path of Exile", "hours": 99, "hours2w": 0, "lastPlayed": "2023-01-17", "genres": ["Экшен", "Приключения"]},
     {"appid": 1091500, "name": "Cyberpunk 2077", "hours": 85, "hours2w": 0, "lastPlayed": "2026-05-09", "genres": ["RPG"]},
     {"appid": 307780, "name": "Mortal Kombat X", "hours": 83, "hours2w": 0, "lastPlayed": "2026-01-12", "genres": ["Экшен"]},
-    {"appid": 2868840, "name": "Slay the Spire 2", "hours": 72, "hours2w": 72.8, "lastPlayed": "2026-09-02", "genres": ["Инди", "Стратегия"]},
+    {"appid": 2868840, "name": "Slay the Spire 2", "hours": 80, "hours2w": 74, "lastPlayed": "2026-09-03", "genres": ["Инди", "Стратегия"]},
     {"appid": 72850, "name": "The Elder Scrolls V: Skyrim", "hours": 64, "hours2w": 0, "lastPlayed": "2023-03-31", "genres": ["RPG"]},
     {"appid": 252490, "name": "Rust", "hours": 59, "hours2w": 0, "lastPlayed": "2021-10-13", "genres": ["Экшен", "Приключения"]},
     {"appid": 412830, "name": "STEINS;GATE", "hours": 59, "hours2w": 0, "lastPlayed": "2020-06-08", "genres": ["Приключения"]},
@@ -43,7 +43,7 @@ window.STEAM_DATA = {
     {"appid": 4000, "name": "Garry's Mod", "hours": 48, "hours2w": 0, "lastPlayed": "2022-07-18", "genres": ["Казуальные", "Инди"]},
     {"appid": 331470, "name": "Everlasting Summer", "hours": 45, "hours2w": 0, "lastPlayed": "2022-03-12", "genres": ["Приключения", "Казуальные"]},
     {"appid": 239140, "name": "Dying Light", "hours": 44, "hours2w": 0, "lastPlayed": "2026-07-04", "genres": ["Экшен", "Приключения"]},
-    {"appid": 2379780, "name": "Balatro", "hours": 41, "hours2w": 19.1, "lastPlayed": "2026-09-01", "genres": ["Казуальные", "Инди"]},
+    {"appid": 2379780, "name": "Balatro", "hours": 42, "hours2w": 15.2, "lastPlayed": "2026-09-03", "genres": ["Казуальные", "Инди"]},
     {"appid": 230410, "name": "Warframe", "hours": 40, "hours2w": 0, "lastPlayed": "2023-01-25", "genres": ["Экшен", "RPG"]},
     {"appid": 292030, "name": "The Witcher 3: Wild Hunt", "hours": 38, "hours2w": 0, "lastPlayed": "2025-03-01", "genres": ["RPG"]},
     {"appid": 1846380, "name": "Need for Speed Unbound", "hours": 35, "hours2w": 0, "lastPlayed": "2025-01-22", "genres": ["Экшен", "Гонки"]},
@@ -135,7 +135,7 @@ window.STEAM_DATA = {
     {"appid": 600420, "name": "Mob Rule Classic", "hours": 0, "hours2w": 0, "lastPlayed": null, "genres": ["Симулятор"]},
     {"appid": 301700, "name": "Numba Deluxe", "hours": 0, "hours2w": 0, "lastPlayed": null, "genres": ["Казуальные"]},
     {"appid": 254040, "name": "Pirates of Black Cove Gold", "hours": 0, "hours2w": 0, "lastPlayed": null, "genres": []},
-    {"appid": 1005240, "name": "Pixel Puzzles Illustrations & Anime Jigsaw Puzzles", "hours": 0, "hours2w": 0, "lastPlayed": null, "genres": ["Казуальные", "Инди"]},
+    {"appid": 1005240, "name": "Pixel Puzzles Illustrations \u0026 Anime Jigsaw Puzzles", "hours": 0, "hours2w": 0, "lastPlayed": null, "genres": ["Казуальные", "Инди"]},
     {"appid": 1058200, "name": "Pixel Puzzles Traditional Jigsaw Puzzles", "hours": 0, "hours2w": 0, "lastPlayed": null, "genres": ["Казуальные", "Инди"]},
     {"appid": 55230, "name": "Saints Row: The Third", "hours": 0, "hours2w": 0, "lastPlayed": null, "genres": ["Экшен"]},
     {"appid": 464350, "name": "Screeps: World", "hours": 0, "hours2w": 0, "lastPlayed": "2022-12-24", "genres": ["Инди", "MMO"]},
